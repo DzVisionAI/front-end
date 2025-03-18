@@ -1,0 +1,22 @@
+@import 'tailwindcss';
+
+/* Additional styles */
+@import './additional-styles/utility-patterns.css';
+@import './additional-styles/range-slider.css';
+@import './additional-styles/toggle-switch.css';
+@import './additional-styles/theme.css';
+
+
+@config "../tailwind.config.mjs";
+
+
+
+@layer utilities {
+    .rtl {
+        direction: rtl;
+    }
+}
+
+[x-cloak=""] {
+    display: none;
+}
