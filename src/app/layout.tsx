@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Architects_Daughter, Inter } from "next/font/google";
-import "./globals.css";
+import './css/style.css'
 
 const inter = Inter({
   subsets: ['latin'],
