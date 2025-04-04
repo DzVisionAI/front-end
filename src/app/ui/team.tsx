@@ -1,13 +1,13 @@
 import Image from 'next/image'
 
-import TeamImage01 from '@/public/images/team-member-01.jpg'
-import TeamImage02 from '@/public/images/team-member-02.jpg'
-import TeamImage03 from '@/public/images/team-member-03.jpg'
-import TeamImage04 from '@/public/images/team-member-04.jpg'
-import TeamImage05 from '@/public/images/team-member-05.jpg'
-import TeamImage06 from '@/public/images/team-member-06.jpg'
-import TeamImage07 from '@/public/images/team-member-07.jpg'
-import TeamImage08 from '@/public/images/team-member-08.jpg'
+import TeamImage01 from '../../../public/images/team-member-01.jpg'
+import TeamImage02 from '../../../public/images/team-member-02.jpg'
+import TeamImage03 from '../../../public/images/team-member-03.jpg'
+import TeamImage04 from '../../../public/images/team-member-04.jpg'
+import TeamImage05 from '../../../public/images/team-member-05.jpg'
+import TeamImage06 from '../../../public/images/team-member-06.jpg'
+import TeamImage07 from '../../../public/images/team-member-07.jpg'
+import TeamImage08 from '../../../public/images/team-member-08.jpg'
 
 export default function Team() {
   return (

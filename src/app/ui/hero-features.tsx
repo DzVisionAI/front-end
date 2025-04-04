@@ -1,6 +1,5 @@
 import Image from 'next/image'
-
-import HeroImage from '@/public/images/hero-image-01.jpg'
+import HeroImage from '../../../public/images/hero-image-01.jpg'
 
 export default function HeroFeatures() {
   return (
@@ -26,7 +25,7 @@ export default function HeroFeatures() {
           <div className="max-w-3xl mx-auto text-center pb-12 md:pb-16">
             <h1 className="h1 mb-4" data-aos="fade-up">Keep track of every important detail</h1>
             <p className="text-xl text-gray-400" data-aos="fade-up" data-aos-delay="200">Every feature in Open PRO makes things easy to build, pleasant to create,
-                and simple to manage.</p>
+              and simple to manage.</p>
           </div>
           {/* Image */}
           <Image className="mx-auto" src={HeroImage} width={768} height={432} alt="Hero" priority data-aos="fade-up" data-aos-delay="400" />

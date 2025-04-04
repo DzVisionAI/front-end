@@ -2,7 +2,7 @@
 
 import { useState, useRef, Fragment } from 'react'
 import type { StaticImageData } from 'next/image'
-import { Dialog, Transition } from '@headlessui/react'
+import { Dialog, Transition,TransitionChild } from '@headlessui/react'
 import Image from 'next/image'
 
 interface ModalVideoProps {
@@ -54,7 +54,7 @@ export default function ModalVideo({
         <Dialog initialFocus={videoRef} onClose={() => setModalOpen(false)}>
 
           {/* Modal backdrop */}
-          <Transition.Child
+          <Transition.Child as={'div'}
             className="fixed inset-0 z-[99999] bg-black bg-opacity-75 transition-opacity"
             enter="transition ease-out duration-200"
             enterFrom="opacity-0"

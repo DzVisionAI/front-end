@@ -3,16 +3,17 @@
 import { useState, useRef, useEffect } from 'react'
 import Image, { StaticImageData } from 'next/image'
 import { Transition } from '@headlessui/react'
+import Particles from './particles'
 
-import WorldImage from '@/public/images/worldmap.png'
-import UserImage01 from '@/public/images/world-user-01.jpg'
-import UserImage02 from '@/public/images/world-user-02.jpg'
-import UserImage03 from '@/public/images/world-user-03.jpg'
-import UserImage04 from '@/public/images/world-user-04.jpg'
-import UserImage05 from '@/public/images/world-user-05.jpg'
-import UserImage06 from '@/public/images/world-user-06.jpg'
-import UserImage07 from '@/public/images/world-user-07.jpg'
-import UserImage08 from '@/public/images/world-user-08.jpg'
+import WorldImage from '../../../public/images/worldmap.png'
+import UserImage01 from '../../../public/images/world-user-01.jpg'
+import UserImage02 from '../../../public/images/world-user-02.jpg'
+import UserImage03 from '../../../public/images/world-user-03.jpg'
+import UserImage04 from '../../../public/images/world-user-04.jpg'
+import UserImage05 from '../../../public/images/world-user-05.jpg'
+import UserImage06 from '../../../public/images/world-user-06.jpg'
+import UserImage07 from '../../../public/images/world-user-07.jpg'
+import UserImage08 from '../../../public/images/world-user-08.jpg'
 
 export default function TestimonialsCarousel() {
 
@@ -26,7 +27,7 @@ export default function TestimonialsCarousel() {
     quote: string
     name: string
     role: string
-  }  
+  }
 
   const items: Item[] = [
     {
@@ -51,8 +52,8 @@ export default function TestimonialsCarousel() {
       role: 'Backend Lead'
     }
   ]
-  
-  const testimonials = useRef<HTMLDivElement>(null)  
+
+  const testimonials = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!autorotate) return

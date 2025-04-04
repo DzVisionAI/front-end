@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'Home - Open PRO',
-  description: 'Page description',
+  title: 'DzVision - AI',
+  description: 'Advanced Military Surveillance System',
 }
 
 import Hero from '@/app/ui/hero-home'
