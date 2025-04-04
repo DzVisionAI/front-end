@@ -1,8 +1,8 @@
 import Image from 'next/image'
 
-import NewsImage10 from '@/public/images/news-10.jpg'
-import NewsImage11 from '@/public/images/news-11.jpg'
-import NewsImage12 from '@/public/images/news-12.jpg'
+import NewsImage10 from '../../../public/images/news-10.jpg'
+import NewsImage11 from '../../../public/images/news-11.jpg'
+import NewsImage12 from '../../../public/images/news-12.jpg'
 
 export default function CaseStudies() {
   return (
@@ -14,7 +14,7 @@ export default function CaseStudies() {
           <div className="max-w-3xl mx-auto text-center pb-12 md:pb-20">
             <h2 className="h2 mb-4">Integrated workflow designed for product teams</h2>
             <p className="text-xl text-gray-400">Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia
-                deserunt mollit laborum — semper quis lectus nulla.</p>
+              deserunt mollit laborum — semper quis lectus nulla.</p>
           </div>
 
           {/* Articles */}

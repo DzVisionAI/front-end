@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import NotFoundImage from '@/public/images/404.jpg'
+import NotFoundImage from '../../public/images/404.jpg'
 import PageIllustration from '@/app/ui/page-illustration'
 
 export default function NotFound() {
@@ -23,7 +23,7 @@ export default function NotFound() {
                 </svg>
               </div>
               {/* 404 content */}
-              <h1 className="h1 mb-4" data-aos="fade-up" data-aos-delay="200">Uh oh. That page doesn’t exist.</h1>
+              <h1 className="h1 mb-4" data-aos="fade-up" data-aos-delay="200">Uh oh. That page doesn't exist.</h1>
               <p className="text-lg text-gray-400" data-aos="fade-up" data-aos-delay="400">Head to our <Link href="/" className="text-purple-600 hover:text-gray-200 transition duration-150 ease-in-out">homepage</Link> that does exist, or try double-checking the URL.</p>
             </div>
           </div>

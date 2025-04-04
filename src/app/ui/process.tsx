@@ -6,8 +6,8 @@ export default function Process() {
 
           {/* Section header */}
           <div className="max-w-3xl mx-auto text-center pb-12 md:pb-20">
-            <h2 className="h2 mb-4" data-aos="fade-up">Built exclusively for you</h2>
-            <p className="text-xl text-gray-400" data-aos="fade-up" data-aos-delay="200">Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit laborum — semper quis lectus nulla.</p>
+            <h2 className="h2 mb-4" data-aos="fade-up">How It Works</h2>
+            <p className="text-xl text-gray-400" data-aos="fade-up" data-aos-delay="200">Our advanced AI surveillance system operates through a seamless workflow, from data capture to actionable insights.</p>
           </div>
 
           {/* Items */}
@@ -21,8 +21,8 @@ export default function Process() {
                 <path className="stroke-current text-purple-300" strokeWidth="2" strokeLinecap="square" d="M21 23h22v18H21z" fill="none" fillRule="evenodd" />
                 <path className="stroke-current text-purple-100" d="M26 28h12M26 32h12M26 36h5" strokeWidth="2" strokeLinecap="square" />
               </svg>
-              <h4 className="h4 mb-2"><span className="text-gray-400">1</span>. Acquisition</h4>
-              <p className="text-lg text-gray-400 text-center">Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+              <h4 className="h4 mb-2"><span className="text-gray-400">1</span>. Data Capture</h4>
+              <p className="text-lg text-gray-400 text-center">High-resolution cameras capture video feeds from multiple surveillance points across the installation.</p>
             </div>
 
             {/* 2nd item */}
@@ -35,8 +35,8 @@ export default function Process() {
                   <path className="stroke-current text-purple-100" strokeWidth="2" strokeLinecap="square" d="M36 32l-4-3-4 3V22h8z" />
                 </g>
               </svg>
-              <h4 className="h4 mb-2"><span className="text-gray-400">2</span>. Activation</h4>
-              <p className="text-lg text-gray-400 text-center">Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+              <h4 className="h4 mb-2"><span className="text-gray-400">2</span>. AI Processing</h4>
+              <p className="text-lg text-gray-400 text-center">Multiple AI models analyze the video feeds in real-time for various security threats and behaviors.</p>
             </div>
 
             {/* 3rd item */}
@@ -44,10 +44,10 @@ export default function Process() {
               <svg className="w-16 h-16 mb-4" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
                 <rect className="fill-current text-purple-600" width="64" height="64" rx="32" />
                 <path className="stroke-current text-purple-300" strokeWidth="2" strokeLinecap="square" d="M21 35l4 4 12-15" fill="none" fillRule="evenodd" />
-                <path className="stroke-current text-purple-100" d="M42 29h-3M42 34h-7M42 39H31" strokeWidth="2" strokeLinecap="square" />
+                <path className="stroke-current text-purple-100" d="M32 42h12M32 38h12M32 34h12" strokeWidth="2" strokeLinecap="square" />
               </svg>
-              <h4 className="h4 mb-2"><span className="text-gray-400">3</span>. Retention</h4>
-              <p className="text-lg text-gray-400 text-center">Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+              <h4 className="h4 mb-2"><span className="text-gray-400">3</span>. Alert & Response</h4>
+              <p className="text-lg text-gray-400 text-center">Real-time alerts and detailed logs are generated for security personnel to take immediate action when needed.</p>
             </div>
 
           </div>
