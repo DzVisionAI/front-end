@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import Dropdown from '@/components/utils/dropdown'
+import Dropdown from '@/app/lib/dropdown'
 import MobileMenu from './mobile-menu'
 
 export default function Header() {
