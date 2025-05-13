@@ -9,7 +9,7 @@ export function middleware(request: NextRequest) {
   // Auth routes - redirect to test-user if logged in
   if (pathname.startsWith('/(auth)') || pathname === '/') {
     if (token) {
-      return NextResponse.redirect(new URL('/test-user', request.url))
+      return NextResponse.redirect(new URL('/dashboard', request.url))
     }
     return NextResponse.next()
   }
