@@ -13,13 +13,13 @@ export default function Sidebar() {
   const sidebar = useRef<HTMLDivElement>(null)
   const { sidebarOpen, setSidebarOpen } = useAppProvider()
   const [sidebarExpanded, setSidebarExpanded] = useState<boolean>(false)
-  const segments = useSelectedLayoutSegments()  
+  const segments = useSelectedLayoutSegments()
   const [breakpoint, setBreakpoint] = useState<string | undefined>(getBreakpoint())
   const expandOnly = !sidebarExpanded && (breakpoint === 'lg' || breakpoint === 'xl')
 
   // close on click outside
   useEffect(() => {
-    const clickHandler = ({ target }: { target: EventTarget | null }): void => {      
+    const clickHandler = ({ target }: { target: EventTarget | null }): void => {
       if (!sidebar.current) return
       if (!sidebarOpen || sidebar.current.contains(target as Node)) return
       setSidebarOpen(false)
@@ -37,17 +37,17 @@ export default function Sidebar() {
     document.addEventListener('keydown', keyHandler)
     return () => document.removeEventListener('keydown', keyHandler)
   })
-  
+
   const handleBreakpoint = () => {
-    setBreakpoint(getBreakpoint())      
+    setBreakpoint(getBreakpoint())
   }
-  
+
   useEffect(() => {
     window.addEventListener('resize', handleBreakpoint)
     return () => {
       window.removeEventListener('resize', handleBreakpoint)
     }
-  }, [breakpoint])    
+  }, [breakpoint])
 
   return (
     <div className={`min-w-fit ${sidebarExpanded ? 'sidebar-expanded' : ''}`}>
@@ -62,7 +62,7 @@ export default function Sidebar() {
         leaveFrom="opacity-100"
         leaveTo="opacity-0"
         aria-hidden="true"
-      />      
+      />
 
       {/* Sidebar */}
       <Transition
@@ -76,7 +76,7 @@ export default function Sidebar() {
         enterTo="translate-x-0"
         leaveFrom="translate-x-0"
         leaveTo="-translate-x-full"
-      >      
+      >
         {/* Sidebar header */}
         <div className="flex justify-between mb-10 pr-3 sm:px-2">
           {/* Close button */}
@@ -951,20 +951,6 @@ export default function Sidebar() {
                             <SidebarLink href="/signin">
                               <span className="text-sm font-medium lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">
                                 Sign in
-                              </span>
-                            </SidebarLink>
-                          </li>
-                          <li className="mb-1 last:mb-0">
-                            <SidebarLink href="/signup">
-                              <span className="text-sm font-medium lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">
-                                Sign up
-                              </span>
-                            </SidebarLink>
-                          </li>
-                          <li className="mb-1 last:mb-0">
-                            <SidebarLink href="/reset-password">
-                              <span className="text-sm font-medium lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">
-                                Reset Password
                               </span>
                             </SidebarLink>
                           </li>

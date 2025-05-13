@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { authService } from '@/app/services/auth'
 import Logo from '@/app/ui/logo'
 
 export default function ResetPassword() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
+  const router = useRouter()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,21 +19,21 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false)
   const [tokenValid, setTokenValid] = useState<boolean | null>(null)
 
-  // Check token validity when component mounts
-  useState(() => {
-    if (token) {
-      validateToken()
-    }
-  })
-
   const validateToken = async () => {
     try {
       const isValid = await authService.validateResetToken(token!)
       setTokenValid(isValid)
-    } catch (err) {
+    } catch {
       setTokenValid(false)
     }
   }
+
+  // Check token validity when component mounts
+  useEffect(() => {
+    if (token) {
+      validateToken()
+    }
+  }, [token])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,14 +49,23 @@ export default function ResetPassword() {
           return
         }
         await authService.resetPassword(token, password)
-        setMessage('Password has been reset successfully. You can now sign in with your new password.')
+        router.push('/signin')
       } else {
         // Request password reset
         await authService.forgotPassword(email)
         setMessage('If an account exists with this email, you will receive password reset instructions.')
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Something went wrong')
+    } catch (err: unknown) {
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        'response' in err &&
+        typeof (err as { response?: { data?: { message?: string } } }).response?.data?.message === 'string'
+      ) {
+        setError((err as { response?: { data?: { message?: string } } }).response!.data!.message!)
+      } else {
+        setError('Something went wrong')
+      }
     } finally {
       setLoading(false)
     }

@@ -20,7 +20,7 @@ export default function SignIn() {
 
         try {
             await authService.login(email, password)
-            router.push('/dashboard') // Redirect to dashboard after successful login
+            router.push('/test-user') // Redirect to test page after successful login
         } catch (err: any) {
             setError(err.response?.data?.message || 'Failed to sign in')
         } finally {
@@ -89,7 +89,7 @@ export default function SignIn() {
                                     </div>
                                     <button
                                         type="submit"
-                                        className="btn bg-indigo-500 hover:bg-indigo-600 text-white ml-3"
+                                        className="btn text-white bg-indigo-500 hover:bg-indigo-600 w-full mb-4 sm:w-auto sm:mb-0"
                                         disabled={loading}
                                     >
                                         {loading ? 'Signing in...' : 'Sign in'}

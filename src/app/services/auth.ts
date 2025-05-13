@@ -47,9 +47,9 @@ class AuthService {
       email,
       password,
     });
-    if (response.data.access_token) {
+    if (response.data.token) {
       // Set cookie
-      this.setCookie('token', response.data.access_token, 7); // 7 days
+      this.setCookie('token', response.data.token, 7); // 7 days
       // Store user data in memory
       this.setUser(response.data.user);
     }
@@ -65,6 +65,7 @@ class AuthService {
   async getCurrentUser(): Promise<User | null> {
     try {
       const token = this.getCookie('token');
+      console.log('token', token);
       if (!token) return null;
 
       const response = await axios.get(`${API_URL}/auth/me`, {
@@ -96,7 +97,7 @@ class AuthService {
   async resetPassword(token: string, password: string): Promise<void> {
     await axios.post(`${API_URL}/auth/reset-password`, {
       token,
-      password,
+      new_password: password,
     });
   }
 
