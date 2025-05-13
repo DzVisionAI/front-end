@@ -4,6 +4,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import Logo from './ui/logo';
 import Footer from './ui/footer';
 import { FaUser, FaUsers, FaBan, FaCog, FaEdit, FaTrash, FaSignOutAlt, FaChevronDown } from 'react-icons/fa';
+import { useRouter } from 'next/navigation';
+import { authService } from '@/app/services/auth';
 
 const tabs = [
     { name: 'Plate' },
@@ -24,15 +26,16 @@ export default function Dashboard() {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [selectedLang, setSelectedLang] = useState(languages[0]);
 
-    const langRef = useRef(null);
-    const settingsRef = useRef(null);
+    const langRef = useRef<HTMLDivElement>(null);
+    const settingsRef = useRef<HTMLDivElement>(null);
+    const router = useRouter();
 
     useEffect(() => {
-        function handleClickOutside(event) {
-            if (langRef.current && !langRef.current.contains(event.target)) {
+        function handleClickOutside(event: MouseEvent) {
+            if (langRef.current && !langRef.current.contains(event.target as Node)) {
                 setLangOpen(false);
             }
-            if (settingsRef.current && !settingsRef.current.contains(event.target)) {
+            if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
                 setSettingsOpen(false);
             }
         }
@@ -41,6 +44,12 @@ export default function Dashboard() {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
+
+    // Logout function using authService
+    const handleLogout = async () => {
+        await authService.logout();
+        router.push('/');
+    };
 
     return (
         <div className="min-h-screen flex flex-col bg-gray-900 text-gray-200 font-inter">
@@ -82,14 +91,19 @@ export default function Dashboard() {
                         </button>
                         {settingsOpen && (
                             <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded shadow-lg z-20">
-                                <a href="#" className="flex items-center px-4 py-2 hover:bg-gray-700"><FaUsers className="mr-2" />User Management</a>
+                                <button
+                                    className="flex items-center w-full px-4 py-2 hover:bg-gray-700"
+                                    onClick={() => { setSettingsOpen(false); router.push('/users'); }}
+                                >
+                                    <FaUsers className="mr-2" />User Management
+                                </button>
                                 <a href="#" className="flex items-center px-4 py-2 hover:bg-gray-700"><FaBan className="mr-2" />Blacklist</a>
                                 <a href="#" className="flex items-center px-4 py-2 hover:bg-gray-700"><FaCog className="mr-2" />Preferences</a>
                             </div>
                         )}
                     </div>
                     {/* Logout Button */}
-                    <button className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-500 rounded focus:outline-none">
+                    <button className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-500 rounded focus:outline-none" onClick={handleLogout}>
                         <FaSignOutAlt className="mr-2" />Logout
                     </button>
                 </div>

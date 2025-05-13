@@ -20,7 +20,7 @@ export default function SignIn() {
 
         try {
             await authService.login(email, password)
-            router.push('/test-user') // Redirect to test page after successful login
+            router.push('/dashboard') // Redirect to test page after successful login
         } catch (err: any) {
             setError(err.response?.data?.message || 'Failed to sign in')
         } finally {
