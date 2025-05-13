@@ -48,8 +48,14 @@ class AuthService {
       password,
     });
     if (response.data.token) {
-      // Set cookie
+      // Set token cookie
       this.setCookie('token', response.data.token, 7); // 7 days
+      // Set role cookie based on returned role number
+      let roleValue = 'user';
+      if (response.data.user.role === 1 || response.data.user.role === '1') {
+        roleValue = 'admin';
+      }
+      this.setCookie('role', roleValue, 7); // 7 days
       // Store user data in memory
       this.setUser(response.data.user);
     }

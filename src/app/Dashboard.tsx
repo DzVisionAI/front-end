@@ -97,7 +97,12 @@ export default function Dashboard() {
                                 >
                                     <FaUsers className="mr-2" />User Management
                                 </button>
-                                <a href="#" className="flex items-center px-4 py-2 hover:bg-gray-700"><FaBan className="mr-2" />Blacklist</a>
+                                <button
+                                    className="flex items-center w-full px-4 py-2 hover:bg-gray-700"
+                                    onClick={() => { setSettingsOpen(false); router.push('/black-lists'); }}
+                                >
+                                    <FaBan className="mr-2" />Blacklist
+                                </button>
                                 <a href="#" className="flex items-center px-4 py-2 hover:bg-gray-700"><FaCog className="mr-2" />Preferences</a>
                             </div>
                         )}
