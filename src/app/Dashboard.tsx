@@ -3,7 +3,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Logo from './ui/logo';
 import Footer from './ui/footer';
-import { FaUser, FaUsers, FaBan, FaCog, FaEdit, FaTrash, FaSignOutAlt, FaChevronDown } from 'react-icons/fa';
+import { FaUser, FaUsers, FaBan, FaCog, FaEdit, FaTrash, FaSignOutAlt, FaChevronDown, FaUserEdit, FaCar, FaVideo, FaIdCard, FaCalendarAlt, FaClock, FaImage } from 'react-icons/fa';
+import { FaFileCsv } from "react-icons/fa";
 import { useRouter } from 'next/navigation';
 import { authService } from '@/app/services/auth';
 
@@ -116,34 +117,68 @@ export default function Dashboard() {
 
             {/* Main Content */}
             <main className="flex-1 p-6 space-y-6">
-                {/* Camera Section */}
+                {/* Camera Section - Redesigned */}
                 <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Uploads */}
-                    <div className="bg-gray-800 rounded-lg p-4 flex flex-col items-center justify-center min-h-[180px] shadow-lg">
-                        <span className="mb-2 font-semibold text-indigo-300">Upload Camera Image</span>
-                        <input type="file" accept="image/*" className="mb-2" />
-                        <span className="mb-2 font-semibold text-indigo-300">Upload Camera Video</span>
-                        <input type="file" accept="video/*" />
-                    </div>
-                    {/* Current Event */}
-                    <div className="bg-gray-800 rounded-lg p-4 flex flex-col items-center min-h-[180px] shadow-lg">
-                        <div className="mb-4 w-full flex flex-col items-center">
-                            <div className="w-40 h-24 bg-gray-700 rounded mb-2 flex items-center justify-center text-gray-400">Car Image</div>
-                            <div className="flex flex-col w-full items-center">
-                                <div className="flex justify-between w-full mb-1">
-                                    <span className="text-xs text-gray-400">PLATE NUMBER</span>
-                                    <span className="text-xs text-gray-400">PLATE IMAGE</span>
-                                </div>
-                                <div className="flex justify-between w-full">
-                                    <span className="font-bold">146تونس8440</span>
-                                    <div className="w-20 h-8 bg-gray-700 rounded flex items-center justify-center text-gray-400">Plate Img</div>
-                                </div>
-                            </div>
+                    {/* Uploads - 2/3 width */}
+                    <div className="md:col-span-2 bg-gray-800 rounded-lg p-6 flex flex-col items-center justify-center min-h-[220px] shadow-lg">
+                        <span className="mb-4 font-semibold text-indigo-300 text-lg flex items-center gap-2">
+                            <span> <FaEdit className="inline-block text-indigo-400 text-xl" /> </span>
+                            Upload Camera Image/Video
+                        </span>
+                        <div className="flex flex-col md:flex-row gap-4 w-full justify-center">
+                            <label className="flex flex-col items-center w-full md:w-1/2 cursor-pointer bg-gray-700 hover:bg-gray-600 transition rounded-lg p-4 border-2 border-dashed border-indigo-500 text-gray-300">
+                                <FaEdit className="text-2xl mb-2 text-indigo-400" />
+                                <span className="mb-2 font-medium">Upload Image</span>
+                                <input type="file" accept="image/*" className="hidden" />
+                            </label>
+                            <label className="flex flex-col items-center w-full md:w-1/2 cursor-pointer bg-gray-700 hover:bg-gray-600 transition rounded-lg p-4 border-2 border-dashed border-indigo-500 text-gray-300">
+                                <FaEdit className="text-2xl mb-2 text-indigo-400" />
+                                <span className="mb-2 font-medium">Upload Video</span>
+                                <input type="file" accept="video/*" className="hidden" />
+                            </label>
                         </div>
-                        <button className="mt-2 px-3 py-1 bg-blue-600 rounded hover:bg-blue-500 text-sm flex items-center"><FaEdit className="mr-1" />Edit</button>
+                        <div className="flex gap-3 mt-6">
+                            <button className="flex items-center gap-2 px-5 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow transition">
+                                <FaEdit className="text-lg" />
+                                Process Upload
+                            </button>
+                            <button className="flex items-center gap-2 px-5 py-2 rounded bg-gray-600 hover:bg-gray-500 text-gray-200 font-semibold shadow transition">
+                                <FaTrash className="text-lg" />
+                                Clear
+                            </button>
+                        </div>
                     </div>
-                    {/* Placeholder for third column (map skipped) */}
-                    <div></div>
+                    {/* Current Event - 1/3 width */}
+                    <div className="md:col-span-1 bg-gray-800 rounded-lg p-6 flex flex-col items-center min-h-[220px] shadow-lg">
+                        <h3 className="text-lg font-bold text-indigo-300 mb-6 w-full text-center tracking-wide">Current Event</h3>
+                        {/* Car Image */}
+                        <div className="w-40 h-24 bg-gray-700 rounded-lg mb-6 flex items-center justify-center text-gray-400 shadow-inner border border-gray-600">
+                            <FaEdit className="text-3xl" />
+                            <span className="ml-2 text-base">Car Image</span>
+                        </div>
+                        {/* Plate Info Table */}
+                        <div className="w-full">
+                            <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
+                                <thead>
+                                    <tr>
+                                        <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Image</th>
+                                        <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Number</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td className="px-3 py-3">
+                                            <div className="w-20 h-8 bg-gray-600 rounded flex items-center justify-center text-gray-400 border border-gray-500">
+                                                <FaEdit className="text-lg" />
+                                                <span className="ml-1 text-xs">Plate Img</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-3 font-bold text-gray-200 text-base">146تونس8440</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </section>
 
                 {/* Tabs Section */}
@@ -165,39 +200,43 @@ export default function Dashboard() {
                     {activeTab === 'Plate' && (
                         <div>
                             <div className="flex justify-end space-x-2 mb-2">
-                                <button className="px-3 py-1 bg-green-600 rounded hover:bg-green-500 text-sm flex items-center"><FaEdit className="mr-1" />Generate PDF</button>
-                                <button className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500 text-sm flex items-center"><FaEdit className="mr-1" />Download CSV</button>
+                                <button className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500 text-sm flex items-center gap-2 font-semibold">
+                                    <FaFileCsv className="text-lg" />
+                                    Download CSV
+                                </button>
                             </div>
                             <div className="overflow-x-auto">
-                                <table className="min-w-full text-sm rounded-lg overflow-hidden">
+                                <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
                                     <thead>
                                         <tr className="bg-gray-700 text-gray-300">
-                                            <th className="px-3 py-2">PLATE NUMBER</th>
-                                            <th className="px-3 py-2">CAR IMAGE</th>
-                                            <th className="px-3 py-2">PLATE IMAGE</th>
-                                            <th className="px-3 py-2">DATE</th>
-                                            <th className="px-3 py-2">TIME</th>
-                                            <th className="px-3 py-2">CAMERA NAME</th>
-                                            <th className="px-3 py-2">POSITION</th>
-                                            <th className="px-3 py-2">ACTIONS</th>
+                                            <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaIdCard />PLATE NUMBER</span></th>
+                                            <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaImage />CAR IMAGE</span></th>
+                                            <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaImage />PLATE IMAGE</span></th>
+                                            <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaCalendarAlt />DATE</span></th>
+                                            <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaClock />TIME</span></th>
+                                            <th className="px-3 py-2 text-left">Driver</th>
+                                            <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaVideo />CAMERAS</span></th>
+                                            <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaCar />VEHICULES</span></th>
+                                            <th className="px-3 py-2 text-center">ACTIONS</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {/* Placeholder rows */}
-                                        <tr className="border-b border-gray-700">
-                                            <td className="px-3 py-2">146تونس8440</td>
-                                            <td className="px-3 py-2"><div className="w-16 h-8 bg-gray-600 rounded"></div></td>
-                                            <td className="px-3 py-2"><div className="w-12 h-6 bg-gray-600 rounded"></div></td>
-                                            <td className="px-3 py-2">10/06/2021</td>
-                                            <td className="px-3 py-2">12:19:50</td>
-                                            <td className="px-3 py-2">Cam0</td>
-                                            <td className="px-3 py-2">In</td>
-                                            <td className="px-3 py-2 flex space-x-2">
-                                                <button className="text-blue-400 hover:underline text-xs flex items-center"><FaEdit className="mr-1" />Edit</button>
-                                                <button className="text-red-400 hover:underline text-xs flex items-center"><FaTrash className="mr-1" />Delete</button>
+                                        {/* Example row - align with headers */}
+                                        <tr className="border-b border-gray-700 even:bg-gray-700/40 hover:bg-gray-700/60 transition">
+                                            <td className="px-3 py-2 align-middle font-semibold text-gray-100">146تونس8440</td>
+                                            <td className="px-3 py-2 align-middle"><div className="w-16 h-8 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div></td>
+                                            <td className="px-3 py-2 align-middle"><div className="w-12 h-6 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div></td>
+                                            <td className="px-3 py-2 align-middle">10/06/2021</td>
+                                            <td className="px-3 py-2 align-middle">12:19:50</td>
+                                            <td className="px-3 py-2 align-middle">John Doe</td>
+                                            <td className="px-3 py-2 align-middle">Cam0</td>
+                                            <td className="px-3 py-2 align-middle">SUV</td>
+                                            <td className="px-3 py-2 align-middle flex space-x-2 justify-center">
+                                                <button className="text-blue-400 hover:text-blue-200 p-1" title="Edit"><FaUserEdit /></button>
+                                                <button className="text-red-400 hover:text-red-200 p-1" title="Delete"><FaTrash /></button>
                                             </td>
                                         </tr>
-                                        {/* Add more placeholder rows as needed */}
+                                        {/* Add more rows as needed */}
                                     </tbody>
                                 </table>
                             </div>

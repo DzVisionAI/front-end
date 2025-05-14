@@ -5,7 +5,6 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value
   const role = request.cookies.get('role')?.value
   const { pathname } = request.nextUrl
-  console.log("role",role)
   // Auth routes - redirect to dashboard if logged in
   if (pathname.startsWith('/(auth)') || pathname === '/') {
     if (token) {

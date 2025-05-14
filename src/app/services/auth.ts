@@ -71,7 +71,6 @@ class AuthService {
   async getCurrentUser(): Promise<User | null> {
     try {
       const token = this.getCookie('token');
-      console.log('token', token);
       if (!token) return null;
 
       const response = await axios.get(`${API_URL}/auth/me`, {
