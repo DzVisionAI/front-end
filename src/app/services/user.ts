@@ -4,16 +4,13 @@ import './auth';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 // Define an enum for user roles
-export enum UserRole {
-  USER = 0,
-  ADMIN = 1,
-}
+export type UserRole = 'user' | 'admin';
 
 export interface User {
   id: number;
   name: string;
   email: string;
-  role: string;
+  role: UserRole;
   status: string;
 }
 
@@ -38,14 +35,13 @@ class UserService {
   async getUsers(): Promise<User[]> {
     try {
       const response = await axios.get(`${API_URL}/users/`);
-      console.log(response)
       const usersRaw = Array.isArray(response.data.users) ? response.data.users : [];
-      type BackendUser = { id: number; username: string; email: string; role: number; createdAt?: string };
+      type BackendUser = { id: number; username: string; email: string; role: string; createdAt?: string };
       return usersRaw.map((u: BackendUser) => ({
         id: u.id,
         name: u.username,
         email: u.email,
-        role: u.role === 1 ? 'Admin' : u.role === 2 ? 'User' : String(u.role),
+        role: u.role.toLowerCase() as UserRole,
         status: 'Active', // You can adjust this if your API provides status
       }));
     } catch (error) {
@@ -63,7 +59,7 @@ class UserService {
         id: u.id,
         name: u.username,
         email: u.email,
-        role: u.role === 1 ? 'Admin' : u.role === 2 ? 'User' : String(u.role),
+        role: u.role.toLowerCase() as UserRole,
         status: 'Active', // Adjust if your API provides status
       };
     } catch (error) {
@@ -79,7 +75,7 @@ class UserService {
         username: string;
         email: string;
         password: string;
-        role?: UserRole;
+        role?: string;
         status?: string;
       } = {
         username: data.username,
@@ -89,7 +85,15 @@ class UserService {
       };
       if (data.status) payload.status = data.status;
       const response = await axios.post(`${API_URL}/users/`, payload);
-      return response.data;
+      const u = response.data.user;
+      if (!u) return null;
+      return {
+        id: u.id,
+        name: u.username,
+        email: u.email,
+        role: u.role ? u.role.toLowerCase() as UserRole : 'user',
+        status: u.status || 'Active',
+      };
     } catch (error) {
       console.error('Failed to create user:', error);
       return null;
@@ -98,8 +102,18 @@ class UserService {
 
   async updateUser(userId: number, data: UpdateUserDto): Promise<User | null> {
     try {
-      const response = await axios.put(`${API_URL}/users/${userId}`, data);
-      return response.data;
+      const payload = { ...data };
+      if (payload.role) payload.role = payload.role;
+      const response = await axios.put(`${API_URL}/users/${userId}`, payload);
+      const u = response.data.user;
+      if (!u) return null;
+      return {
+        id: u.id,
+        name: u.username,
+        email: u.email,
+        role: u.role ? u.role.toLowerCase() as UserRole : 'user',
+        status: u.status || 'Active',
+      };
     } catch (error) {
       console.error('Failed to update user:', error);
       return null;

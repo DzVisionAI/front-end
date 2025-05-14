@@ -6,7 +6,7 @@ import { FaPlus, FaSearch, FaUserEdit, FaTrash, FaChevronLeft, FaChevronRight, F
 import { useRouter } from 'next/navigation';
 import { userService, User, CreateUserDto } from '../services/user';
 
-const roles = ['All', 'Admin', 'User'];
+const roles = ['All', 'admin', 'user'];
 const statuses = ['All', 'Active', 'Inactive'];
 
 export default function UsersPage() {
@@ -21,7 +21,7 @@ export default function UsersPage() {
     const router = useRouter();
 
     // Modal form state
-    const [form, setForm] = useState<CreateUserDto>({ username: '', email: '', password: '' });
+    const [form, setForm] = useState<CreateUserDto>({ username: '', email: '', password: '', role: 'user', status: 'Active' });
 
     React.useEffect(() => {
         userService.getUsers().then(setUsers);
@@ -40,14 +40,14 @@ export default function UsersPage() {
     const paginatedUsers = filteredUsers.slice((page - 1) * pageSize, page * pageSize);
 
     const openCreateModal = () => {
-        setForm({ username: '', email: '', password: '' });
+        setForm({ username: '', email: '', password: '', role: 'user', status: 'Active' });
         setIsEdit(false);
         setEditingUserId(null);
         setModalOpen(true);
     };
 
     const openEditModal = (user: User) => {
-        setForm({ username: user.name, email: user.email, password: '' });
+        setForm({ username: user.name, email: user.email, password: '', role: user.role, status: user.status });
         setIsEdit(true);
         setEditingUserId(user.id);
         setModalOpen(true);
@@ -57,8 +57,8 @@ export default function UsersPage() {
         e.preventDefault();
         if (isEdit && editingUserId !== null) {
             // Don't send password on update
-            const { username, email } = form;
-            const updated = await userService.updateUser(editingUserId, { username, email });
+            const { username, email, role, status } = form;
+            const updated = await userService.updateUser(editingUserId, { username, email, role, status });
             if (updated) setUsers(users => users.map(u => u.id === editingUserId ? updated : u));
         } else {
             const created = await userService.createUser(form);
@@ -208,7 +208,7 @@ export default function UsersPage() {
                                 <Dialog.Title className="text-lg font-bold text-indigo-400 mb-4">{isEdit ? 'Edit User' : 'Create New User'}</Dialog.Title>
                                 <form className="space-y-4" onSubmit={handleSubmit}>
                                     <div>
-                                        <label className="block text-sm mb-1">Username</label>
+                                        <label className="block text-gray-200  text-sm mb-1">Username</label>
                                         <input
                                             type="text"
                                             className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none"
@@ -217,7 +217,7 @@ export default function UsersPage() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm mb-1">Email</label>
+                                        <label className="block text-gray-200  text-sm mb-1">Email</label>
                                         <input
                                             type="email"
                                             className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none"
@@ -227,7 +227,7 @@ export default function UsersPage() {
                                     </div>
                                     {!isEdit && (
                                         <div>
-                                            <label className="block text-sm mb-1">Password</label>
+                                            <label className="block text-gray-200  text-sm mb-1">Password</label>
                                             <input
                                                 type="password"
                                                 className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none"
@@ -238,17 +238,19 @@ export default function UsersPage() {
                                     )}
                                     <div className="flex gap-2">
                                         <div className="flex-1">
-                                            <label className="block text-sm mb-1">Role</label>
+                                            <label className="block text-gray-200  text-sm mb-1">Role</label>
                                             <select
                                                 className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none"
                                                 value={form.role}
-                                                onChange={e => setForm({ ...form, role: e.target.value })}
+                                                onChange={e => setForm({ ...form, role: e.target.value as 'admin' | 'user' })}
                                             >
-                                                {roles.filter(r => r !== 'All').map(role => <option key={role}>{role}</option>)}
+                                                {roles.filter(r => r !== 'All').map(role => (
+                                                    <option key={role} value={role}>{role.charAt(0).toUpperCase() + role.slice(1)}</option>
+                                                ))}
                                             </select>
                                         </div>
                                         <div className="flex-1">
-                                            <label className="block text-sm mb-1">Status</label>
+                                            <label className="block text-gray-200  text-sm mb-1">Status</label>
                                             <select
                                                 className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none"
                                                 value={form.status}
