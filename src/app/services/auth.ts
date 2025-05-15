@@ -24,7 +24,7 @@ class AuthService {
     const date = new Date();
     date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
     const expires = `expires=${date.toUTCString()}`;
-    document.cookie = `${name}=${value};${expires};path=/;samesite=strict${process.env.NODE_ENV === 'production' ? ';secure' : ''}`;
+    document.cookie = `${name}=${value};${expires};path=/;samesite=lax${process.env.NODE_ENV === 'production' ? ';secure' : ''}`;
   }
 
   private getCookie(name: string): string | null {
@@ -50,14 +50,16 @@ class AuthService {
     if (response.data.token) {
       // Set token cookie
       this.setCookie('token', response.data.token, 7); // 7 days
-      // Set role cookie based on returned role number
-      let roleValue = 'user';
-      if (response.data.user.role === 1 || response.data.user.role === '1') {
-        roleValue = 'admin';
-      }
+      // Set role cookie based on backend value (string or number)
+      let roleValue = (typeof response.data.user.role === 'string')
+        ? response.data.user.role.toLowerCase()
+        : (response.data.user.role === 1 ? 'admin' : 'user');
       this.setCookie('role', roleValue, 7); // 7 days
       // Store user data in memory
       this.setUser(response.data.user);
+      // If using Zustand, hydrate here:
+      // import { useUserStore } from '../lib/store';
+      // useUserStore.getState().setUser(response.data.user);
     }
     return response.data;
   }

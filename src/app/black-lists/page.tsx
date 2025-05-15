@@ -1,28 +1,10 @@
 'use client'
 
-import React, { useState, Fragment } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { FaPlus, FaSearch, FaUserEdit, FaTrash, FaChevronLeft, FaChevronRight, FaArrowLeft } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
-
-const blacklistData = [
-    {
-        id: 1,
-        plateNumber: '242-565-14',
-        addedBy: { id: 1, username: 'admin' },
-        createAt: 'Tue, 13 May 2025 05:56:15 GMT',
-        reason: 'Stolen vehicle',
-        status: 'Active',
-    },
-    {
-        id: 2,
-        plateNumber: '123-456-78',
-        addedBy: { id: 2, username: 'officer1' },
-        createAt: 'Wed, 14 May 2025 10:20:00 GMT',
-        reason: 'Unpaid fines',
-        status: 'Inactive',
-    },
-];
+import { blacklistService, BlacklistEntry, CreateBlacklistDto } from '../services/blacklist';
 
 const statuses = ['All', 'Active', 'Inactive'];
 
@@ -31,18 +13,86 @@ export default function BlacklistPage() {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [page, setPage] = useState(1);
-    const [blacklist] = useState(blacklistData);
+    const [blacklist, setBlacklist] = useState<BlacklistEntry[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [editId, setEditId] = useState<number | null>(null);
     const router = useRouter();
 
     // Modal form state
-    const [form, setForm] = useState({ plateNumber: '', reason: '', status: 'Active' });
+    const [form, setForm] = useState<CreateBlacklistDto>({ plateNumber: '', reason: '', status: 'Active' });
+
+    // Fetch blacklist entries
+    useEffect(() => {
+        const fetchBlacklist = async () => {
+            setLoading(true);
+            const data = await blacklistService.getBlacklists();
+            setBlacklist(data);
+            setLoading(false);
+        };
+        fetchBlacklist();
+    }, []);
+
+    // CRUD Handlers
+    const handleAdd = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const created = await blacklistService.createBlacklist(form);
+        if (created) setBlacklist(list => [created, ...list]);
+        setModalOpen(false);
+        setForm({ plateNumber: '', reason: '', status: 'Active' });
+    };
+
+    const handleDelete = async (id: number) => {
+        if (await blacklistService.deleteBlacklist(id)) {
+            setBlacklist(list => list.filter(entry => entry.id !== id));
+        }
+    };
+
+    const openEditModal = (entry: BlacklistEntry) => {
+        setEditId(entry.id);
+        setForm({ plateNumber: entry.plateNumber, reason: entry.reason, status: entry.status });
+        setModalOpen(true);
+    };
+
+    const handleEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (editId !== null) {
+            // Find the original entry
+            const original = blacklist.find(entry => entry.id === editId);
+            if (!original) return;
+            // Compute only changed fields
+            const changedFields: Partial<import('../services/blacklist').UpdateBlacklistDto> = {};
+            if (form.plateNumber !== original.plateNumber) changedFields.plateNumber = form.plateNumber;
+            if (form.reason !== original.reason) changedFields.reason = form.reason;
+            if (form.status !== original.status) changedFields.status = form.status;
+            if (Object.keys(changedFields).length > 0) {
+                const updated = await blacklistService.updateBlacklist(editId, changedFields);
+                if (updated) {
+                    setBlacklist(list => list.map(entry =>
+                        entry.id === editId
+                            ? { ...entry, ...changedFields }
+                            : entry
+                    ));
+                }
+            }
+        }
+        setModalOpen(false);
+        setEditId(null);
+        setForm({ plateNumber: '', reason: '', status: 'Active' });
+    };
+
+    const openAddModal = () => {
+        setEditId(null);
+        setForm({ plateNumber: '', reason: '', status: 'Active' });
+        setModalOpen(true);
+    };
 
     // Filtered blacklist
     const filteredBlacklist = blacklist.filter(entry =>
         (statusFilter === 'All' || entry.status === statusFilter) &&
-        (entry.plateNumber.toLowerCase().includes(search.toLowerCase()) ||
-            (entry.reason && entry.reason.toLowerCase().includes(search.toLowerCase())) ||
-            (entry.addedBy.username && entry.addedBy.username.toLowerCase().includes(search.toLowerCase()))
+        (
+            (typeof entry.plateNumber === 'string' && entry.plateNumber.toLowerCase().includes(search.toLowerCase())) ||
+            (typeof entry.reason === 'string' && entry.reason.toLowerCase().includes(search.toLowerCase())) ||
+            (entry.addedBy && typeof entry.addedBy.username === 'string' && entry.addedBy.username.toLowerCase().includes(search.toLowerCase()))
         )
     );
 
@@ -67,7 +117,7 @@ export default function BlacklistPage() {
                 </div>
                 <button
                     className="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded text-white font-semibold shadow"
-                    onClick={() => setModalOpen(true)}
+                    onClick={openAddModal}
                 >
                     <FaPlus className="mr-2" /> Add to Blacklist
                 </button>
@@ -110,7 +160,11 @@ export default function BlacklistPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {paginatedBlacklist.length === 0 ? (
+                        {loading ? (
+                            <tr>
+                                <td colSpan={6} className="text-center py-6 text-gray-400">Loading...</td>
+                            </tr>
+                        ) : paginatedBlacklist.length === 0 ? (
                             <tr>
                                 <td colSpan={6} className="text-center py-6 text-gray-400">No blacklist entries found.</td>
                             </tr>
@@ -118,15 +172,15 @@ export default function BlacklistPage() {
                             paginatedBlacklist.map(entry => (
                                 <tr key={entry.id} className="border-b border-gray-700">
                                     <td className="px-4 py-2 align-top">{entry.plateNumber}</td>
-                                    <td className="px-4 py-2 align-top">{entry.addedBy.username}</td>
+                                    <td className="px-4 py-2 align-top">{entry.addedBy?.username || '-'}</td>
                                     <td className="px-4 py-2 align-top">{entry.createAt}</td>
                                     <td className="px-4 py-2 align-top">{entry.reason || '-'}</td>
                                     <td className="px-4 py-2 align-top">
                                         <span className={`px-2 py-1 rounded text-xs font-semibold ${entry.status === 'Active' ? 'bg-green-700 text-green-200' : 'bg-red-700 text-red-200'}`}>{entry.status || '-'}</span>
                                     </td>
                                     <td className="px-4 py-2 align-top text-right">
-                                        <button className="text-blue-400 hover:text-blue-200 p-1" title="Edit"><FaUserEdit /></button>
-                                        <button className="text-red-400 hover:text-red-200 p-1 ml-2" title="Delete"><FaTrash /></button>
+                                        <button className="text-blue-400 hover:text-blue-200 p-1" title="Edit" onClick={() => openEditModal(entry)}><FaUserEdit /></button>
+                                        <button className="text-red-400 hover:text-red-200 p-1 ml-2" title="Delete" onClick={() => handleDelete(entry.id)}><FaTrash /></button>
                                     </td>
                                 </tr>
                             ))
@@ -180,7 +234,7 @@ export default function BlacklistPage() {
                         >
                             <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 z-50 relative">
                                 <Dialog.Title className="text-lg font-bold text-indigo-400 mb-4">Add to Blacklist</Dialog.Title>
-                                <form className="space-y-4">
+                                <form className="space-y-4" onSubmit={editId === null ? handleAdd : handleEdit}>
                                     <div>
                                         <label className="block text-sm mb-1">Plate Number</label>
                                         <input
@@ -220,9 +274,8 @@ export default function BlacklistPage() {
                                         <button
                                             type="submit"
                                             className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
-                                            onClick={e => { e.preventDefault(); setModalOpen(false); }}
                                         >
-                                            Add
+                                            {editId === null ? 'Add' : 'Update'}
                                         </button>
                                     </div>
                                 </form>

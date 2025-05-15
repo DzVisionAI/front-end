@@ -7,6 +7,7 @@ import { FaUser, FaUsers, FaBan, FaCog, FaEdit, FaTrash, FaSignOutAlt, FaChevron
 import { FaFileCsv } from "react-icons/fa";
 import { useRouter } from 'next/navigation';
 import { authService } from '@/app/services/auth';
+import { useUserStore } from './lib/store';
 
 const tabs = [
     { name: 'Plate' },
@@ -26,6 +27,8 @@ export default function Dashboard() {
     const [langOpen, setLangOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [selectedLang, setSelectedLang] = useState(languages[0]);
+    const user = useUserStore(state => state.user);
+    const setUser = useUserStore(state => state.setUser);
 
     const langRef = useRef<HTMLDivElement>(null);
     const settingsRef = useRef<HTMLDivElement>(null);
@@ -45,6 +48,18 @@ export default function Dashboard() {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
+
+    useEffect(() => {
+        // Hydrate user from cookie if not already set
+        if (!user) {
+            const match = document.cookie.match(/(?:^|; )role=([^;]*)/);
+            const role = match ? decodeURIComponent(match[1]) : null;
+            // Optionally, you can also hydrate id/email/name from other cookies or a backend call
+            if (role) {
+                setUser({ id: 0, email: '', name: '', role });
+            }
+        }
+    }, [user, setUser]);
 
     // Logout function using authService
     const handleLogout = async () => {
@@ -92,18 +107,22 @@ export default function Dashboard() {
                         </button>
                         {settingsOpen && (
                             <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded shadow-lg z-20">
-                                <button
-                                    className="flex items-center w-full px-4 py-2 hover:bg-gray-700"
-                                    onClick={() => { setSettingsOpen(false); router.push('/users'); }}
-                                >
-                                    <FaUsers className="mr-2" />User Management
-                                </button>
-                                <button
-                                    className="flex items-center w-full px-4 py-2 hover:bg-gray-700"
-                                    onClick={() => { setSettingsOpen(false); router.push('/black-lists'); }}
-                                >
-                                    <FaBan className="mr-2" />Blacklist
-                                </button>
+                                {user?.role === 'admin' && (
+                                    <>
+                                        <button
+                                            className="flex items-center w-full px-4 py-2 hover:bg-gray-700"
+                                            onClick={() => { setSettingsOpen(false); router.push('/users'); }}
+                                        >
+                                            <FaUsers className="mr-2" />User Management
+                                        </button>
+                                        <button
+                                            className="flex items-center w-full px-4 py-2 hover:bg-gray-700"
+                                            onClick={() => { setSettingsOpen(false); router.push('/black-lists'); }}
+                                        >
+                                            <FaBan className="mr-2" />Blacklist
+                                        </button>
+                                    </>
+                                )}
                                 <a href="#" className="flex items-center px-4 py-2 hover:bg-gray-700"><FaCog className="mr-2" />Preferences</a>
                             </div>
                         )}
