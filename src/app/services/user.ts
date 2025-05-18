@@ -30,6 +30,21 @@ export interface UpdateUserDto {
   status?: string;
 }
 
+// Add a type guard for axios error
+function isAxiosErrorWithMessage(error: unknown): error is { response: { data: { message: string } } } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as { response?: unknown }).response === 'object' &&
+    (error as { response?: unknown }).response !== null &&
+    'data' in (error as { response?: { data?: unknown } }).response &&
+    typeof (error as { response: { data?: unknown } }).response.data === 'object' &&
+    (error as { response: { data?: unknown } }).response.data !== null &&
+    'message' in (error as { response: { data: { message?: unknown } } }).response.data
+  );
+}
+
 // All endpoints require authentication. The token is added by the axios interceptor in auth.ts
 class UserService {
   async getUsers(): Promise<User[]> {
@@ -126,6 +141,45 @@ class UserService {
       return true;
     } catch (error) {
       console.error('Failed to delete user:', error);
+      return false;
+    }
+  }
+
+  // Update current user's profile (email, username)
+  async updateMyProfile(data: { email?: string; username?: string }): Promise<User | null> {
+    try {
+      const response = await axios.put(`${API_URL}/user/me/profile`, data);
+      const u = response.data.user;
+      if (!u) return null;
+      return {
+        id: u.id,
+        name: u.username,
+        email: u.email,
+        role: u.role ? u.role.toLowerCase() as UserRole : 'user',
+        status: u.status || 'Active',
+      };
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      return null;
+    }
+  }
+
+  // Reset current user's password
+  async resetMyPassword(data: { oldPassword: string; newPassword: string }): Promise<boolean | { message: string }> {
+    try {
+      const response = await axios.post(`${API_URL}/users/me/reset-password`, {
+        old_password: data.oldPassword,
+        new_password: data.newPassword,
+      });
+      if (response.data && response.data.success === false && response.data.message) {
+        return { message: response.data.message };
+      }
+      return true;
+    } catch (error: unknown) {
+      if (isAxiosErrorWithMessage(error)) {
+        return { message: error.response.data.message };
+      }
+      console.error('Failed to reset password:', error);
       return false;
     }
   }

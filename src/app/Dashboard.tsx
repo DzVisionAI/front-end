@@ -3,11 +3,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Logo from './ui/logo';
 import Footer from './ui/footer';
-import { FaUser, FaUsers, FaBan, FaCog, FaEdit, FaTrash, FaSignOutAlt, FaChevronDown, FaUserEdit, FaCar, FaVideo, FaIdCard, FaCalendarAlt, FaClock, FaImage } from 'react-icons/fa';
+import { FaUser, FaUsers, FaBan, FaEdit, FaTrash, FaSignOutAlt, FaChevronDown, FaUserEdit, FaCar, FaVideo, FaIdCard, FaCalendarAlt, FaClock, FaImage, FaKey } from 'react-icons/fa';
 import { FaFileCsv } from "react-icons/fa";
 import { useRouter } from 'next/navigation';
 import { authService } from '@/app/services/auth';
 import { useUserStore } from './lib/store';
+import { userService } from './services/user';
 
 const tabs = [
     { name: 'Plate' },
@@ -29,6 +30,11 @@ export default function Dashboard() {
     const [selectedLang, setSelectedLang] = useState(languages[0]);
     const user = useUserStore(state => state.user);
     const setUser = useUserStore(state => state.setUser);
+    const [profileModalOpen, setProfileModalOpen] = useState(false);
+    const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
+    const [passwordMsg, setPasswordMsg] = useState('');
+    const [passwordErr, setPasswordErr] = useState('');
+    const [passwordLoading, setPasswordLoading] = useState(false);
 
     const langRef = useRef<HTMLDivElement>(null);
     const settingsRef = useRef<HTMLDivElement>(null);
@@ -65,6 +71,36 @@ export default function Dashboard() {
     const handleLogout = async () => {
         await authService.logout();
         router.push('/');
+    };
+
+    // Password reset handler
+    const handlePasswordSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPasswordMsg(''); setPasswordErr(''); setPasswordLoading(true);
+        if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+            setPasswordErr('Passwords do not match.');
+            setPasswordLoading(false);
+            return;
+        }
+        try {
+            const ok = await userService.resetMyPassword({ oldPassword: passwordForm.oldPassword, newPassword: passwordForm.newPassword });
+            if (ok === true) {
+                setPasswordMsg('Password reset successfully.');
+                setPasswordForm({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
+            } else if (ok && typeof ok === 'object' && ok.message) {
+                setPasswordErr(ok.message);
+            } else {
+                setPasswordErr('Failed to reset password.');
+            }
+        } catch (err: any) {
+            if (err && err.response && err.response.data && err.response.data.message) {
+                setPasswordErr(err.response.data.message);
+            } else {
+                setPasswordErr('Failed to reset password.');
+            }
+        } finally {
+            setPasswordLoading(false);
+        }
     };
 
     return (
@@ -123,7 +159,12 @@ export default function Dashboard() {
                                         </button>
                                     </>
                                 )}
-                                <a href="#" className="flex items-center px-4 py-2 hover:bg-gray-700"><FaCog className="mr-2" />Preferences</a>
+                                <button
+                                    className="flex items-center w-full px-4 py-2 hover:bg-gray-700"
+                                    onClick={() => { setSettingsOpen(false); setProfileModalOpen(true); }}
+                                >
+                                    <FaKey className="mr-2" />Reset Password
+                                </button>
                             </div>
                         )}
                     </div>
@@ -133,6 +174,33 @@ export default function Dashboard() {
                     </button>
                 </div>
             </header>
+
+            {/* Password Reset Modal */}
+            {profileModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6 relative">
+                        <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-200" onClick={() => { setProfileModalOpen(false); setPasswordMsg(''); setPasswordErr(''); }}>&times;</button>
+                        <h2 className="text-xl font-bold text-indigo-300 mb-4 text-center">Reset Password</h2>
+                        <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-gray-200 text-sm mb-1">Current Password</label>
+                                <input type="password" className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none" value={passwordForm.oldPassword} onChange={e => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })} required />
+                            </div>
+                            <div>
+                                <label className="block text-gray-200 text-sm mb-1">New Password</label>
+                                <input type="password" className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none" value={passwordForm.newPassword} onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} required />
+                            </div>
+                            <div>
+                                <label className="block text-gray-200 text-sm mb-1">Confirm New Password</label>
+                                <input type="password" className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none" value={passwordForm.confirmNewPassword} onChange={e => setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value })} required />
+                            </div>
+                            {passwordMsg && <div className="text-green-400 text-sm">{passwordMsg}</div>}
+                            {passwordErr && <div className="text-red-400 text-sm">{passwordErr}</div>}
+                            <button type="submit" className="w-full py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow transition" disabled={passwordLoading}>{passwordLoading ? 'Saving...' : 'Reset Password'}</button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Main Content */}
             <main className="flex-1 p-6 space-y-6">
