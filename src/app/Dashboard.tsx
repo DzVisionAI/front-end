@@ -3,18 +3,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Logo from './ui/logo';
 import Footer from './ui/footer';
-import { FaUser, FaUsers, FaBan, FaEdit, FaTrash, FaSignOutAlt, FaChevronDown, FaUserEdit, FaCar, FaVideo, FaIdCard, FaCalendarAlt, FaClock, FaImage, FaKey } from 'react-icons/fa';
+import { FaUser, FaUsers, FaBan, FaEdit, FaTrash, FaSignOutAlt, FaChevronDown, FaUserEdit, FaVideo, FaIdCard, FaCalendarAlt, FaClock, FaImage, FaKey } from 'react-icons/fa';
 import { FaFileCsv } from "react-icons/fa";
 import { useRouter } from 'next/navigation';
 import { authService } from '@/app/services/auth';
 import { useUserStore } from './lib/store';
 import { userService } from './services/user';
+import { tabService } from './services/tabService';
 
 const tabs = [
     { name: 'Plate' },
-    { name: 'Report' },
-    { name: 'Alert' },
-    { name: 'Driver' },
+    { name: 'Events' },
+    { name: 'Vehicules' },
+    { name: 'Drivers' },
+    { name: 'Cameras' },
 ];
 
 const languages = [
@@ -22,6 +24,58 @@ const languages = [
     { code: 'fr', label: 'Français', flag: '🇫🇷' },
     { code: 'ar', label: 'العربية', flag: '🇩🇿' },
 ];
+
+// Define Plate type
+interface Plate {
+    id: number;
+    plateNumber: string;
+    detectedAt: string;
+    image: string;
+    cameraId: number | null;
+    vehicle: {
+        id: number;
+        image: string;
+        color: string | null;
+        make: string | null;
+        model: string | null;
+        ownerId: number | null;
+        registerAt: string;
+    };
+}
+
+interface Event {
+    id: number;
+    cameraId: number | null;
+    description: string;
+    driverId: number | null;
+    plateId: number | null;
+    time: string;
+    typeName: string;
+}
+
+interface Vehicule {
+    id: number;
+    color: string | null;
+    image: string;
+    make: string | null;
+    model: string | null;
+    ownerId: number | null;
+    plateNumber: string | null;
+    registerAt: string;
+}
+
+// Helper to convert local file path to browser path
+// function toPublicPlateImagePath(path: string | null | undefined): string | undefined {
+//     if (!path) return undefined;
+//     // If already a public path, return as is
+//     if (path.startsWith('/uploads/plates/')) return path;
+//     // Otherwise, extract after '/uploads/plates/'
+//     const idx = path.indexOf('/uploads/plates/');
+//     if (idx !== -1) {
+//         return path.substring(idx);
+//     }
+//     return undefined;
+// }
 
 export default function Dashboard() {
     const [activeTab, setActiveTab] = useState('Plate');
@@ -35,6 +89,9 @@ export default function Dashboard() {
     const [passwordMsg, setPasswordMsg] = useState('');
     const [passwordErr, setPasswordErr] = useState('');
     const [passwordLoading, setPasswordLoading] = useState(false);
+    const [tabData, setTabData] = useState<Plate[] | unknown[]>([]);
+    const [tabLoading, setTabLoading] = useState(false);
+    const [tabError, setTabError] = useState('');
 
     const langRef = useRef<HTMLDivElement>(null);
     const settingsRef = useRef<HTMLDivElement>(null);
@@ -67,6 +124,42 @@ export default function Dashboard() {
         }
     }, [user, setUser]);
 
+    // Helper type guard for error
+    function isApiErrorWithMessage(err: unknown): err is { response: { data: { message: string } } } {
+        return (
+            typeof err === 'object' &&
+            err !== null &&
+            'response' in err &&
+            typeof (err as { response?: unknown }).response === 'object' &&
+            (err as { response?: unknown }).response !== null &&
+            (err as { response?: unknown }).response !== undefined &&
+            'data' in ((err as { response?: { data?: unknown } }).response ?? {}) &&
+            typeof ((err as { response: { data?: unknown } }).response?.data) === 'object' &&
+            ((err as { response: { data?: unknown } }).response?.data) !== null &&
+            'message' in (((err as { response: { data: { message?: unknown } } }).response?.data) ?? {})
+        );
+    }
+
+    useEffect(() => {
+        let fetcher: (() => Promise<Plate[]>) | null = null;
+        setTabError('');
+        setTabLoading(true);
+        if (activeTab === 'Plate') fetcher = tabService.getLicensePlates;
+        else if (activeTab === 'Events') fetcher = tabService.getEvents as () => Promise<Plate[]>;
+        else if (activeTab === 'Vehicules') fetcher = tabService.getVehicules as () => Promise<Plate[]>;
+        else if (activeTab === 'Drivers') fetcher = tabService.getDrivers as () => Promise<Plate[]>;
+        else if (activeTab === 'Cameras') fetcher = tabService.getCameras as () => Promise<Plate[]>;
+        if (fetcher) {
+            fetcher()
+                .then(data => setTabData(Array.isArray(data) ? data : []))
+                .catch(() => setTabError('Failed to load data.'))
+                .finally(() => setTabLoading(false));
+        } else {
+            setTabData([]);
+            setTabLoading(false);
+        }
+    }, [activeTab]);
+
     // Logout function using authService
     const handleLogout = async () => {
         await authService.logout();
@@ -92,8 +185,8 @@ export default function Dashboard() {
             } else {
                 setPasswordErr('Failed to reset password.');
             }
-        } catch (err: any) {
-            if (err && err.response && err.response.data && err.response.data.message) {
+        } catch (err: unknown) {
+            if (isApiErrorWithMessage(err)) {
                 setPasswordErr(err.response.data.message);
             } else {
                 setPasswordErr('Failed to reset password.');
@@ -284,7 +377,11 @@ export default function Dashboard() {
                     </div>
 
                     {/* Tab Content */}
-                    {activeTab === 'Plate' && (
+                    {tabLoading ? (
+                        <div className="text-center text-gray-400 py-8">Loading...</div>
+                    ) : tabError ? (
+                        <div className="text-center text-red-400 py-8">{tabError}</div>
+                    ) : activeTab === 'Plate' ? (
                         <div>
                             <div className="flex justify-end space-x-2 mb-2">
                                 <button className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500 text-sm flex items-center gap-2 font-semibold">
@@ -303,34 +400,133 @@ export default function Dashboard() {
                                             <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaClock />TIME</span></th>
                                             <th className="px-3 py-2 text-left">Driver</th>
                                             <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaVideo />CAMERAS</span></th>
-                                            <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaCar />VEHICULES</span></th>
                                             <th className="px-3 py-2 text-center">ACTIONS</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {/* Example row - align with headers */}
-                                        <tr className="border-b border-gray-700 even:bg-gray-700/40 hover:bg-gray-700/60 transition">
-                                            <td className="px-3 py-2 align-middle font-semibold text-gray-100">146تونس8440</td>
-                                            <td className="px-3 py-2 align-middle"><div className="w-16 h-8 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div></td>
-                                            <td className="px-3 py-2 align-middle"><div className="w-12 h-6 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div></td>
-                                            <td className="px-3 py-2 align-middle">10/06/2021</td>
-                                            <td className="px-3 py-2 align-middle">12:19:50</td>
-                                            <td className="px-3 py-2 align-middle">John Doe</td>
-                                            <td className="px-3 py-2 align-middle">Cam0</td>
-                                            <td className="px-3 py-2 align-middle">SUV</td>
-                                            <td className="px-3 py-2 align-middle flex space-x-2 justify-center">
-                                                <button className="text-blue-400 hover:text-blue-200 p-1" title="Edit"><FaUserEdit /></button>
-                                                <button className="text-red-400 hover:text-red-200 p-1" title="Delete"><FaTrash /></button>
-                                            </td>
-                                        </tr>
-                                        {/* Add more rows as needed */}
+                                        {tabData.length === 0 ? (
+                                            <tr><td colSpan={8} className="text-center text-gray-400 py-4">No data found.</td></tr>
+                                        ) : (
+                                            (tabData as Plate[]).map((row, idx) => {
+                                                const plate = row as Plate;
+                                                return (
+                                                    <tr key={plate.id || idx} className="border-b border-gray-700 even:bg-gray-700/40 hover:bg-gray-700/60 transition">
+                                                        <td className="px-3 py-2 align-middle font-semibold text-gray-100">{plate.plateNumber || '-'}</td>
+                                                        <td className="px-3 py-2 align-middle">
+                                                            {(plate.vehicle?.image) ? (
+                                                                <img src={plate.vehicle?.image} alt="Vehicle" className="w-16 h-8 object-cover rounded mx-auto" />
+                                                            ) : (
+                                                                <div className="w-16 h-8 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 py-2 align-middle">
+                                                            {(plate.image) ? (
+                                                                <img src={(plate.image)} alt="Plate" className="w-12 h-6 object-cover rounded mx-auto" />
+                                                            ) : (
+                                                                <div className="w-12 h-6 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 py-2 align-middle">{plate.detectedAt ? new Date(plate.detectedAt).toLocaleDateString() : '-'}</td>
+                                                        <td className="px-3 py-2 align-middle">{plate.detectedAt ? new Date(plate.detectedAt).toLocaleTimeString() : '-'}</td>
+                                                        <td className="px-3 py-2 align-middle">-</td>
+                                                        <td className="px-3 py-2 align-middle">{plate.cameraId ?? '-'}</td>
+                                                        <td className="px-3 py-2 align-middle flex space-x-2 justify-center">
+                                                            <button className="text-blue-400 hover:text-blue-200 p-1" title="Edit"><FaUserEdit /></button>
+                                                            <button className="text-red-400 hover:text-red-200 p-1" title="Delete"><FaTrash /></button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
-                    )}
-                    {/* Other tabs placeholder */}
-                    {activeTab !== 'Plate' && (
+                    ) : activeTab === 'Events' ? (
+                        <div>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
+                                    <thead>
+                                        <tr className="bg-gray-700 text-gray-300">
+                                            <th className="px-3 py-2 text-left">ID</th>
+                                            <th className="px-3 py-2 text-left">Camera ID</th>
+                                            <th className="px-3 py-2 text-left">Description</th>
+                                            <th className="px-3 py-2 text-left">Driver ID</th>
+                                            <th className="px-3 py-2 text-left">Plate ID</th>
+                                            <th className="px-3 py-2 text-left">Time</th>
+                                            <th className="px-3 py-2 text-left">Type</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {tabData.length === 0 ? (
+                                            <tr><td colSpan={7} className="text-center text-gray-400 py-4">No data found.</td></tr>
+                                        ) : (
+                                            (tabData as Event[]).map((row, idx) => {
+                                                const event = row as Event;
+                                                return (
+                                                    <tr key={event.id || idx} className="border-b border-gray-700 even:bg-gray-700/40 hover:bg-gray-700/60 transition">
+                                                        <td className="px-3 py-2 align-middle">{event.id}</td>
+                                                        <td className="px-3 py-2 align-middle">{event.cameraId ?? '-'}</td>
+                                                        <td className="px-3 py-2 align-middle">{event.description || '-'}</td>
+                                                        <td className="px-3 py-2 align-middle">{event.driverId ?? '-'}</td>
+                                                        <td className="px-3 py-2 align-middle">{event.plateId ?? '-'}</td>
+                                                        <td className="px-3 py-2 align-middle">{event.time ? new Date(event.time).toLocaleString() : '-'}</td>
+                                                        <td className="px-3 py-2 align-middle">{event.typeName || '-'}</td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ) : activeTab === 'Vehicules' ? (
+                        <div>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
+                                    <thead>
+                                        <tr className="bg-gray-700 text-gray-300">
+                                            <th className="px-3 py-2 text-left">ID</th>
+                                            <th className="px-3 py-2 text-left">Image</th>
+                                            <th className="px-3 py-2 text-left">Color</th>
+                                            <th className="px-3 py-2 text-left">Make</th>
+                                            <th className="px-3 py-2 text-left">Model</th>
+                                            <th className="px-3 py-2 text-left">Owner ID</th>
+                                            <th className="px-3 py-2 text-left">Plate Number</th>
+                                            <th className="px-3 py-2 text-left">Register At</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {tabData.length === 0 ? (
+                                            <tr><td colSpan={8} className="text-center text-gray-400 py-4">No data found.</td></tr>
+                                        ) : (
+                                            (tabData as Vehicule[]).map((row, idx) => {
+                                                const vehicule = row as Vehicule;
+                                                return (
+                                                    <tr key={vehicule.id || idx} className="border-b border-gray-700 even:bg-gray-700/40 hover:bg-gray-700/60 transition">
+                                                        <td className="px-3 py-2 align-middle">{vehicule.id}</td>
+                                                        <td className="px-3 py-2 align-middle">
+                                                            {vehicule.image ? (
+                                                                <img src={vehicule.image} alt="Vehicle" className="w-16 h-8 object-cover rounded mx-auto" />
+                                                            ) : (
+                                                                <div className="w-16 h-8 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 py-2 align-middle">{vehicule.color || '-'}</td>
+                                                        <td className="px-3 py-2 align-middle">{vehicule.make || '-'}</td>
+                                                        <td className="px-3 py-2 align-middle">{vehicule.model || '-'}</td>
+                                                        <td className="px-3 py-2 align-middle">{vehicule.ownerId ?? '-'}</td>
+                                                        <td className="px-3 py-2 align-middle">{vehicule.plateNumber || '-'}</td>
+                                                        <td className="px-3 py-2 align-middle">{vehicule.registerAt ? new Date(vehicule.registerAt).toLocaleDateString() : '-'}</td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ) : (
                         <div className="text-gray-400 text-center py-8">{activeTab} content coming soon...</div>
                     )}
                 </section>
