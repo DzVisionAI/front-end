@@ -123,6 +123,31 @@ type DetectionResult = {
     success?: boolean;
 };
 
+// Simple animated dots loader
+function DotsLoader({ color = 'text-indigo-400', size = 'text-lg' }) {
+    return (
+        <span className={`inline-block ${color} ${size} animate-pulse`} style={{ letterSpacing: '2px' }}>
+            <span className="dot">•</span>
+            <span className="dot">•</span>
+            <span className="dot">•</span>
+        </span>
+    );
+}
+
+// Clean bouncing dots loader for processing
+function ProcessingLoader({ message = 'Processing, please wait...' }) {
+    return (
+        <span className="flex items-center gap-2">
+            <span className="flex space-x-1">
+                <span className="block w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
+                <span className="block w-2 h-2 bg-indigo-300 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></span>
+                <span className="block w-2 h-2 bg-indigo-200 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></span>
+            </span>
+            <span className="text-indigo-200 text-xs font-medium">{message}</span>
+        </span>
+    );
+}
+
 export default function Dashboard() {
     const [activeTab, setActiveTab] = useState('Plate');
     const [langOpen, setLangOpen] = useState(false);
@@ -297,7 +322,7 @@ export default function Dashboard() {
         setUploadPreview(null);
         setUploadLoading(true);
         setProcessResult(null);
-
+        addNotification({ type: 'info', message: 'Uploading media...' });
         try {
             let data;
             if (type === 'image') {
@@ -309,8 +334,9 @@ export default function Dashboard() {
                 setUploadedFilename(data.filename);
                 setUploadPreview(data.thumbnail_signed_url || data.thumbnail_blob_url || '');
             }
+            addNotification({ type: 'success', message: 'Upload successful!' });
         } catch {
-            alert('Failed to upload file.');
+            addNotification({ type: 'error', message: 'Failed to upload file.' });
             setUploadedFilename(null);
             setUploadPreview(null);
         } finally {
@@ -482,20 +508,26 @@ export default function Dashboard() {
                                 />
                             </label>
                         </div>
-                        {uploadPreview && (
+                        {uploadLoading ? (
+                            <div className="mt-4 flex flex-col items-center">
+                                <span className="text-gray-300 mb-2">Uploading... <DotsLoader /></span>
+                            </div>
+                        ) : uploadPreview ? (
                             <div className="mt-4 flex flex-col items-center">
                                 <span className="text-gray-300 mb-2">Preview:</span>
                                 <img src={uploadPreview} alt="Preview" className="max-w-xs max-h-40 rounded shadow" />
                             </div>
-                        )}
+                        ) : null}
                         <div className="flex gap-3 mt-6">
                             <button
-                                className="flex items-center gap-2 px-5 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow transition"
+                                className="flex items-center gap-2 px-5 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow transition min-w-[160px] justify-center"
                                 onClick={handleProcessUpload}
                                 disabled={!uploadedFilename || !uploadType || processLoading}
                             >
                                 <FaEdit className="text-lg" />
-                                {processLoading ? 'Processing...' : 'Process Upload'}
+                                {processLoading ? (
+                                    <ProcessingLoader message="Processing, please wait..." />
+                                ) : 'Process Upload'}
                             </button>
                             <button
                                 className="flex items-center gap-2 px-5 py-2 rounded bg-gray-600 hover:bg-gray-500 text-gray-200 font-semibold shadow transition"
@@ -508,18 +540,20 @@ export default function Dashboard() {
                         </div>
                     </div>
                     {/* Current Event - 1/3 width */}
-                    <div className="md:col-span-1 bg-gray-800 rounded-lg p-6 flex flex-col items-center min-h-[220px] shadow-lg">
-                        <h3 className="text-lg font-bold text-indigo-300 mb-6 w-full text-center tracking-wide">Current Event</h3>
+                    <div className="md:col-span-1 bg-gray-900 rounded-xl p-6 flex flex-col items-center min-h-[320px] shadow-2xl border border-indigo-700/30">
+                        <h3 className="text-xl font-bold text-indigo-300 mb-4 w-full text-center tracking-wide uppercase">Detection Result</h3>
                         {/* Car Image */}
                         {processResult && processResult.detections && processResult.detections.length > 0 ? (
                             <>
-                                <div className="w-40 h-24 bg-gray-700 rounded-lg mb-6 flex items-center justify-center text-gray-400 shadow-inner border border-gray-600">
-                                    <img src={processResult.detections[0].vehicle.signed_url} alt="Car" className="w-full h-full object-cover rounded" />
-                                    <span className="ml-2 text-base">Car Image</span>
+                                <div className="w-full flex flex-col items-center mb-4">
+                                    <div className="w-48 h-28 rounded-lg flex items-center justify-center shadow-inner border-2 border-indigo-600/30 mb-2 bg-gradient-to-br from-indigo-900 via-gray-900 to-indigo-700">
+                                        <img src={processResult.detections[0].vehicle.signed_url} alt="Detected Vehicle" className="w-full h-full object-cover rounded" />
+                                    </div>
+                                    <span className="text-base font-semibold text-indigo-300">Detected Vehicle</span>
                                 </div>
                                 {/* Plate Info Table */}
                                 <div className="w-full">
-                                    <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
+                                    <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
                                         <thead>
                                             <tr>
                                                 <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Image</th>
@@ -530,7 +564,7 @@ export default function Dashboard() {
                                             <tr>
                                                 <td className="px-3 py-3">
                                                     {processResult.detections[0].license_plate?.signed_url ? (
-                                                        <img src={processResult.detections[0].license_plate.signed_url} alt="Plate" className="w-20 h-8 object-cover rounded" />
+                                                        <img src={processResult.detections[0].license_plate.signed_url} alt="Plate" className="w-20 h-8 object-cover rounded border border-indigo-400/40" />
                                                     ) : (
                                                         <div className="w-20 h-8 bg-gray-600 rounded flex items-center justify-center text-gray-400 border border-gray-500">
                                                             <FaEdit className="text-lg" />
@@ -548,12 +582,14 @@ export default function Dashboard() {
                             </>
                         ) : (
                             <>
-                                <div className="w-40 h-24 bg-gray-700 rounded-lg mb-6 flex items-center justify-center text-gray-400 shadow-inner border border-gray-600">
-                                    <FaEdit className="text-3xl" />
-                                    <span className="ml-2 text-base">Car Image</span>
+                                <div className="w-full flex flex-col items-center mb-4">
+                                    <div className="w-48 h-28 rounded-lg flex items-center justify-center shadow-inner border-2 border-indigo-600/30 mb-2 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-700">
+                                        <FaEdit className="text-3xl text-gray-400" />
+                                    </div>
+                                    <span className="text-base font-semibold text-gray-400">No Detection</span>
                                 </div>
                                 <div className="w-full">
-                                    <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
+                                    <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
                                         <thead>
                                             <tr>
                                                 <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Image</th>
