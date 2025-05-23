@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Architects_Daughter, Inter } from "next/font/google";
 import './css/style.css'
+import { NotificationStack } from '../components/notification';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -41,7 +42,7 @@ export default function RootLayout({
                   }
                 } catch(e) {}
               })();
-            `,  
+            `,
           }}
         />
       </head>
@@ -51,6 +52,7 @@ export default function RootLayout({
         <div className="flex flex-col min-h-screen overflow-hidden">
           {children}
         </div>
+        <NotificationStack />
       </body>
     </html>
   );

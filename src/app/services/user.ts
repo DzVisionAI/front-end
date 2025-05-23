@@ -1,5 +1,6 @@
 import axios from 'axios';
 import './auth';
+import { useNotificationStore } from '../lib/store';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -102,6 +103,10 @@ class UserService {
       const response = await axios.post(`${API_URL}/users/`, payload);
       const u = response.data.user;
       if (!u) return null;
+      if (typeof window !== 'undefined') {
+        const { addNotification } = require('../lib/store').useNotificationStore.getState();
+        addNotification({ type: 'success', message: 'User created successfully' });
+      }
       return {
         id: u.id,
         name: u.username,
@@ -110,6 +115,10 @@ class UserService {
         status: u.status || 'Active',
       };
     } catch (error) {
+      if (typeof window !== 'undefined') {
+        const { addNotification } = require('../lib/store').useNotificationStore.getState();
+        addNotification({ type: 'error', message: 'Failed to create user' });
+      }
       console.error('Failed to create user:', error);
       return null;
     }
@@ -122,6 +131,10 @@ class UserService {
       const response = await axios.put(`${API_URL}/users/${userId}`, payload);
       const u = response.data.user;
       if (!u) return null;
+      if (typeof window !== 'undefined') {
+        const { addNotification } = require('../lib/store').useNotificationStore.getState();
+        addNotification({ type: 'success', message: 'User updated successfully' });
+      }
       return {
         id: u.id,
         name: u.username,
@@ -130,6 +143,10 @@ class UserService {
         status: u.status || 'Active',
       };
     } catch (error) {
+      if (typeof window !== 'undefined') {
+        const { addNotification } = require('../lib/store').useNotificationStore.getState();
+        addNotification({ type: 'error', message: 'Failed to update user' });
+      }
       console.error('Failed to update user:', error);
       return null;
     }
@@ -138,8 +155,16 @@ class UserService {
   async deleteUser(userId: number): Promise<boolean> {
     try {
       await axios.delete(`${API_URL}/users/${userId}`);
+      if (typeof window !== 'undefined') {
+        const { addNotification } = require('../lib/store').useNotificationStore.getState();
+        addNotification({ type: 'success', message: 'User deleted successfully' });
+      }
       return true;
     } catch (error) {
+      if (typeof window !== 'undefined') {
+        const { addNotification } = require('../lib/store').useNotificationStore.getState();
+        addNotification({ type: 'error', message: 'Failed to delete user' });
+      }
       console.error('Failed to delete user:', error);
       return false;
     }
@@ -172,10 +197,22 @@ class UserService {
         new_password: data.newPassword,
       });
       if (response.data && response.data.success === false && response.data.message) {
+        if (typeof window !== 'undefined') {
+          const { addNotification } = require('../lib/store').useNotificationStore.getState();
+          addNotification({ type: 'error', message: response.data.message });
+        }
         return { message: response.data.message };
+      }
+      if (typeof window !== 'undefined') {
+        const { addNotification } = require('../lib/store').useNotificationStore.getState();
+        addNotification({ type: 'success', message: 'Password reset successfully' });
       }
       return true;
     } catch (error: unknown) {
+      if (typeof window !== 'undefined') {
+        const { addNotification } = require('../lib/store').useNotificationStore.getState();
+        addNotification({ type: 'error', message: 'Failed to reset password' });
+      }
       if (isAxiosErrorWithMessage(error)) {
         return { message: error.response.data.message };
       }

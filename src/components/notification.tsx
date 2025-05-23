@@ -1,11 +1,16 @@
+'use client'
 import { ReactElement } from 'react'
+import { useEffect, useState } from 'react';
+import { useNotificationStore } from '../app/lib/store';
 
 interface NotificationProps {
   children: React.ReactNode
   className?: string
-  type?: 'warning' | 'error' | 'success' | ''
+  type?: 'warning' | 'error' | 'success' | 'info' | ''
   open: boolean
   setOpen: (open: boolean) => void
+  id: string
+  onClose: (id: string) => void
 }
 
 export default function Notification({
@@ -13,7 +18,9 @@ export default function Notification({
   className = '',
   type = '',
   open,
-  setOpen
+  setOpen,
+  id,
+  onClose
 }: NotificationProps) {
 
   const typeIcon = (type: string): ReactElement => {
@@ -57,19 +64,69 @@ export default function Notification({
                   {children}
                 </div>
               </div>
-              <button className="opacity-70 hover:opacity-80 ml-3 mt-[3px]" onClick={() => setOpen(false)}>
+              <button className="opacity-70 hover:opacity-80 ml-3 mt-[3px]" onClick={() => {
+                setOpen(false);
+                setTimeout(() => onClose(id), 300);
+              }}>
                 <div className="sr-only">Close</div>
                 <svg className="w-4 h-4 fill-current">
                   <path d="M7.95 6.536l4.242-4.243a1 1 0 111.415 1.414L9.364 7.95l4.243 4.242a1 1 0 11-1.415 1.415L7.95 9.364l-4.243 4.243a1 1 0 01-1.414-1.415L6.536 7.95 2.293 3.707a1 1 0 011.414-1.414L7.95 6.536z" />
                 </svg>
               </button>
             </div>
-            <div className="text-right mt-1">
-              <a className="font-medium text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400" href="#0">Action -&gt;</a>
-            </div>
           </div>
         </div>
       }
     </>
   )
+}
+
+export function NotificationStack() {
+  const { notifications, removeNotification } = useNotificationStore();
+  const [openMap, setOpenMap] = useState<{ [id: string]: boolean }>({});
+
+  useEffect(() => {
+    // Open all new notifications
+    setOpenMap((prev) => {
+      const next = { ...prev };
+      notifications.forEach((n) => {
+        if (!(n.id in next)) next[n.id] = true;
+      });
+      return next;
+    });
+  }, [notifications]);
+
+  useEffect(() => {
+    // Auto-dismiss after 3s
+    notifications.forEach((n) => {
+      if (openMap[n.id]) {
+        const timer = setTimeout(() => {
+          setOpenMap((prev) => ({ ...prev, [n.id]: false }));
+          setTimeout(() => removeNotification(n.id), 300); // Remove after fade
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
+    });
+  }, [notifications, openMap, removeNotification]);
+
+  if (notifications.length === 0) return null;
+  return (
+    <div className="fixed z-50 bottom-4 right-4 flex flex-col gap-2 items-end">
+      {notifications.map((n) => (
+        <Notification
+          key={n.id}
+          type={n.type}
+          open={openMap[n.id]}
+          setOpen={(open) => {
+            setOpenMap((prev) => ({ ...prev, [n.id]: open }));
+            if (!open) setTimeout(() => removeNotification(n.id), 300);
+          }}
+          id={n.id}
+          onClose={removeNotification}
+        >
+          {n.message}
+        </Notification>
+      ))}
+    </div>
+  );
 }

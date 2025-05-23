@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useNotificationStore } from '../lib/store';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -57,9 +58,11 @@ class AuthService {
       this.setCookie('role', roleValue, 7); // 7 days
       // Store user data in memory
       this.setUser(response.data.user);
-      // If using Zustand, hydrate here:
-      // import { useUserStore } from '../lib/store';
-      // useUserStore.getState().setUser(response.data.user);
+      // Show notification
+      if (typeof window !== 'undefined') {
+        const { addNotification } = require('../lib/store').useNotificationStore.getState();
+        addNotification({ type: 'info', message: 'Logged in successfully' });
+      }
     }
     return response.data;
   }
@@ -67,6 +70,10 @@ class AuthService {
   logout(): void {
     this.deleteCookie('token');
     this.setUser(null);
+    if (typeof window !== 'undefined') {
+      const { addNotification } = require('../lib/store').useNotificationStore.getState();
+      addNotification({ type: 'info', message: 'Logged out successfully' });
+    }
     window.location.href = '/';
   }
 
