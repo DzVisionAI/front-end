@@ -56,7 +56,7 @@ export default function Notification({
     <>
       {open &&
         <div className={className} role="alert">
-          <div className="inline-flex flex-col w-full max-w-lg px-4 py-2 rounded-sm text-sm bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
+          <div className="inline-flex flex-col w-full max-w-lg px-4 py-4 rounded-sm text-sm bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400">
             <div className="flex w-full justify-between items-start">
               <div className="flex">
                 {typeIcon(type)}

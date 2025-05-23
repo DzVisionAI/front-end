@@ -1,12 +1,21 @@
 'use client'
 
-import React, { useState, useEffect, Fragment } from 'react';
+import React, { useState, useEffect, Fragment, useRef } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { FaPlus, FaSearch, FaUserEdit, FaTrash, FaChevronLeft, FaChevronRight, FaArrowLeft } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
 import { blacklistService, BlacklistEntry, CreateBlacklistDto } from '../services/blacklist';
 
 const statuses = ['All', 'Active', 'Inactive'];
+
+// Helper to show notification
+async function showNotification(type: 'success' | 'error' | 'info' | 'warning', message: string) {
+    if (typeof window !== 'undefined') {
+        const mod = await import('../lib/store');
+        const { addNotification } = mod.useNotificationStore.getState();
+        addNotification({ type, message });
+    }
+}
 
 export default function BlacklistPage() {
     const [modalOpen, setModalOpen] = useState(false);
@@ -20,6 +29,12 @@ export default function BlacklistPage() {
 
     // Modal form state
     const [form, setForm] = useState<CreateBlacklistDto>({ plateNumber: '', reason: '', status: 'Active' });
+
+    // Notification ref to avoid stale closure in async
+    const notificationRef = useRef<typeof import('../lib/store') | null>(null);
+    if (typeof window !== 'undefined' && !notificationRef.current) {
+        notificationRef.current = require('../lib/store');
+    }
 
     // Fetch blacklist entries
     useEffect(() => {
@@ -36,7 +51,12 @@ export default function BlacklistPage() {
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
         const created = await blacklistService.createBlacklist(form);
-        if (created) setBlacklist(list => [created, ...list]);
+        if (created) {
+            setBlacklist(list => [created, ...list]);
+            showNotification('success', 'Blacklist entry added successfully');
+        } else {
+            showNotification('error', 'Failed to add blacklist entry');
+        }
         setModalOpen(false);
         setForm({ plateNumber: '', reason: '', status: 'Active' });
     };
@@ -44,6 +64,9 @@ export default function BlacklistPage() {
     const handleDelete = async (id: number) => {
         if (await blacklistService.deleteBlacklist(id)) {
             setBlacklist(list => list.filter(entry => entry.id !== id));
+            showNotification('success', 'Blacklist entry deleted successfully');
+        } else {
+            showNotification('error', 'Failed to delete blacklist entry');
         }
     };
 
@@ -72,6 +95,9 @@ export default function BlacklistPage() {
                             ? { ...entry, ...changedFields }
                             : entry
                     ));
+                    showNotification('success', 'Blacklist entry updated successfully');
+                } else {
+                    showNotification('error', 'Failed to update blacklist entry');
                 }
             }
         }
@@ -236,7 +262,7 @@ export default function BlacklistPage() {
                                 <Dialog.Title className="text-lg font-bold text-indigo-400 mb-4">Add to Blacklist</Dialog.Title>
                                 <form className="space-y-4" onSubmit={editId === null ? handleAdd : handleEdit}>
                                     <div>
-                                        <label className="block text-sm mb-1">Plate Number</label>
+                                        <label className="block text-sm mb-1 text-gray-200">Plate Number</label>
                                         <input
                                             type="text"
                                             className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none"
@@ -245,16 +271,16 @@ export default function BlacklistPage() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm mb-1">Reason</label>
+                                        <label className="block text-sm mb-1 text-gray-200 ">Reason</label>
                                         <input
-                                            type="text"
+                                            type="text" 
                                             className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none"
                                             value={form.reason}
                                             onChange={e => setForm({ ...form, reason: e.target.value })}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm mb-1">Status</label>
+                                        <label className="block text-sm mb-1 text-gray-200">Status</label>
                                         <select
                                             className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none"
                                             value={form.status}

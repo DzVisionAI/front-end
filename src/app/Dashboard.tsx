@@ -11,6 +11,8 @@ import { useUserStore } from './lib/store';
 import { userService } from './services/user';
 import { tabService } from './services/tabService';
 import * as XLSX from 'xlsx';
+import { videoService } from './services/videoService';
+import { useNotificationStore } from './lib/store';
 
 const tabs = [
     { name: 'Plate' },
@@ -95,6 +97,32 @@ function downloadCSV(data: any[], filename: string) {
     window.URL.revokeObjectURL(url);
 }
 
+// Type for detection result
+type DetectionResult = {
+    detections?: Array<{
+        detection_time: string;
+        frame_number: number;
+        license_plate: {
+            gcs_url: string;
+            id: number;
+            image_path: string;
+            number: string;
+            signed_url: string;
+        };
+        success: boolean;
+        vehicle: {
+            color: string | null;
+            gcs_url: string;
+            id: number;
+            image_path: string;
+            plate_number: string;
+            signed_url: string;
+        };
+    }>;
+    message?: string;
+    success?: boolean;
+};
+
 export default function Dashboard() {
     const [activeTab, setActiveTab] = useState('Plate');
     const [langOpen, setLangOpen] = useState(false);
@@ -119,9 +147,18 @@ export default function Dashboard() {
     const [vehiculesPage, setVehiculesPage] = useState(1);
     const [vehiculesPagination, setVehiculesPagination] = useState({ page: 1, pages: 1, total: 0, limit: 10 });
 
+    // --- Upload/Process State ---
+    const [uploadType, setUploadType] = useState<'image' | 'video' | null>(null);
+    const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
+    const [uploadPreview, setUploadPreview] = useState<string | null>(null); // for thumbnail/image
+    const [uploadLoading, setUploadLoading] = useState(false);
+    const [processLoading, setProcessLoading] = useState(false);
+    const [processResult, setProcessResult] = useState<DetectionResult | null>(null);
+
     const langRef = useRef<HTMLDivElement>(null);
     const settingsRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
+    const addNotification = useNotificationStore(state => state.addNotification);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -251,6 +288,67 @@ export default function Dashboard() {
         }
     };
 
+    // --- Upload Handlers ---
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploadType(type);
+        setUploadedFilename(null);
+        setUploadPreview(null);
+        setUploadLoading(true);
+        setProcessResult(null);
+
+        try {
+            let data;
+            if (type === 'image') {
+                data = await videoService.uploadImage(file);
+                setUploadedFilename(data.filename);
+                setUploadPreview(data.image_signed_url || data.image_blob_url || '');
+            } else {
+                data = await videoService.uploadVideo(file);
+                setUploadedFilename(data.filename);
+                setUploadPreview(data.thumbnail_signed_url || data.thumbnail_blob_url || '');
+            }
+        } catch {
+            alert('Failed to upload file.');
+            setUploadedFilename(null);
+            setUploadPreview(null);
+        } finally {
+            setUploadLoading(false);
+        }
+    };
+
+    const handleClearUpload = () => {
+        setUploadType(null);
+        setUploadedFilename(null);
+        setUploadPreview(null);
+        setProcessResult(null);
+    };
+
+    const handleProcessUpload = async () => {
+        if (!uploadedFilename || !uploadType) return;
+        setProcessLoading(true);
+        setProcessResult(null);
+        try {
+            let data: DetectionResult;
+            if (uploadType === 'image') {
+                data = await videoService.processImage(uploadedFilename);
+            } else {
+                data = await videoService.processVideo(uploadedFilename);
+            }
+            setProcessResult(data);
+            if (data && data.success) {
+                addNotification({ type: 'success', message: data.message || 'Process succeeded.' });
+            } else {
+                addNotification({ type: 'error', message: data && data.message ? data.message : 'Process failed.' });
+            }
+        } catch {
+            addNotification({ type: 'error', message: 'Failed to process upload.' });
+        } finally {
+            setProcessLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen flex flex-col bg-gray-900 text-gray-200 font-inter">
             {/* Header */}
@@ -364,20 +462,46 @@ export default function Dashboard() {
                             <label className="flex flex-col items-center w-full md:w-1/2 cursor-pointer bg-gray-700 hover:bg-gray-600 transition rounded-lg p-4 border-2 border-dashed border-indigo-500 text-gray-300">
                                 <FaEdit className="text-2xl mb-2 text-indigo-400" />
                                 <span className="mb-2 font-medium">Upload Image</span>
-                                <input type="file" accept="image/*" className="hidden" />
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={e => handleFileChange(e, 'image')}
+                                    disabled={uploadLoading}
+                                />
                             </label>
                             <label className="flex flex-col items-center w-full md:w-1/2 cursor-pointer bg-gray-700 hover:bg-gray-600 transition rounded-lg p-4 border-2 border-dashed border-indigo-500 text-gray-300">
                                 <FaEdit className="text-2xl mb-2 text-indigo-400" />
                                 <span className="mb-2 font-medium">Upload Video</span>
-                                <input type="file" accept="video/*" className="hidden" />
+                                <input
+                                    type="file"
+                                    accept="video/*"
+                                    className="hidden"
+                                    onChange={e => handleFileChange(e, 'video')}
+                                    disabled={uploadLoading}
+                                />
                             </label>
                         </div>
+                        {uploadPreview && (
+                            <div className="mt-4 flex flex-col items-center">
+                                <span className="text-gray-300 mb-2">Preview:</span>
+                                <img src={uploadPreview} alt="Preview" className="max-w-xs max-h-40 rounded shadow" />
+                            </div>
+                        )}
                         <div className="flex gap-3 mt-6">
-                            <button className="flex items-center gap-2 px-5 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow transition">
+                            <button
+                                className="flex items-center gap-2 px-5 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow transition"
+                                onClick={handleProcessUpload}
+                                disabled={!uploadedFilename || !uploadType || processLoading}
+                            >
                                 <FaEdit className="text-lg" />
-                                Process Upload
+                                {processLoading ? 'Processing...' : 'Process Upload'}
                             </button>
-                            <button className="flex items-center gap-2 px-5 py-2 rounded bg-gray-600 hover:bg-gray-500 text-gray-200 font-semibold shadow transition">
+                            <button
+                                className="flex items-center gap-2 px-5 py-2 rounded bg-gray-600 hover:bg-gray-500 text-gray-200 font-semibold shadow transition"
+                                onClick={handleClearUpload}
+                                disabled={uploadLoading || processLoading}
+                            >
                                 <FaTrash className="text-lg" />
                                 Clear
                             </button>
@@ -387,32 +511,70 @@ export default function Dashboard() {
                     <div className="md:col-span-1 bg-gray-800 rounded-lg p-6 flex flex-col items-center min-h-[220px] shadow-lg">
                         <h3 className="text-lg font-bold text-indigo-300 mb-6 w-full text-center tracking-wide">Current Event</h3>
                         {/* Car Image */}
-                        <div className="w-40 h-24 bg-gray-700 rounded-lg mb-6 flex items-center justify-center text-gray-400 shadow-inner border border-gray-600">
-                            <FaEdit className="text-3xl" />
-                            <span className="ml-2 text-base">Car Image</span>
-                        </div>
-                        {/* Plate Info Table */}
-                        <div className="w-full">
-                            <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
-                                <thead>
-                                    <tr>
-                                        <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Image</th>
-                                        <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Number</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td className="px-3 py-3">
-                                            <div className="w-20 h-8 bg-gray-600 rounded flex items-center justify-center text-gray-400 border border-gray-500">
-                                                <FaEdit className="text-lg" />
-                                                <span className="ml-1 text-xs">Plate Img</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-3 font-bold text-gray-200 text-base">146تونس8440</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        {processResult && processResult.detections && processResult.detections.length > 0 ? (
+                            <>
+                                <div className="w-40 h-24 bg-gray-700 rounded-lg mb-6 flex items-center justify-center text-gray-400 shadow-inner border border-gray-600">
+                                    <img src={processResult.detections[0].vehicle.signed_url} alt="Car" className="w-full h-full object-cover rounded" />
+                                    <span className="ml-2 text-base">Car Image</span>
+                                </div>
+                                {/* Plate Info Table */}
+                                <div className="w-full">
+                                    <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
+                                        <thead>
+                                            <tr>
+                                                <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Image</th>
+                                                <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Number</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td className="px-3 py-3">
+                                                    {processResult.detections[0].license_plate?.signed_url ? (
+                                                        <img src={processResult.detections[0].license_plate.signed_url} alt="Plate" className="w-20 h-8 object-cover rounded" />
+                                                    ) : (
+                                                        <div className="w-20 h-8 bg-gray-600 rounded flex items-center justify-center text-gray-400 border border-gray-500">
+                                                            <FaEdit className="text-lg" />
+                                                            <span className="ml-1 text-xs">Plate Img</span>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-3 font-bold text-gray-200 text-base">
+                                                    {processResult.detections[0].license_plate?.number || '-'}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="w-40 h-24 bg-gray-700 rounded-lg mb-6 flex items-center justify-center text-gray-400 shadow-inner border border-gray-600">
+                                    <FaEdit className="text-3xl" />
+                                    <span className="ml-2 text-base">Car Image</span>
+                                </div>
+                                <div className="w-full">
+                                    <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
+                                        <thead>
+                                            <tr>
+                                                <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Image</th>
+                                                <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Number</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td className="px-3 py-3">
+                                                    <div className="w-20 h-8 bg-gray-600 rounded flex items-center justify-center text-gray-400 border border-gray-500">
+                                                        <FaEdit className="text-lg" />
+                                                        <span className="ml-1 text-xs">Plate Img</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-3 font-bold text-gray-200 text-base">-</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </section>
 
