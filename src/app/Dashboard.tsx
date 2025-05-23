@@ -10,6 +10,7 @@ import { authService } from '@/app/services/auth';
 import { useUserStore } from './lib/store';
 import { userService } from './services/user';
 import { tabService } from './services/tabService';
+import * as XLSX from 'xlsx';
 
 const tabs = [
     { name: 'Plate' },
@@ -79,6 +80,20 @@ interface Vehicule {
 //     }
 //     return undefined;
 // }
+
+// Utility function to download CSV using xlsx
+function downloadCSV(data: any[], filename: string) {
+    if (!data || data.length === 0) return;
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const csv = XLSX.utils.sheet_to_csv(worksheet);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
 
 export default function Dashboard() {
     const [activeTab, setActiveTab] = useState('Plate');
@@ -424,7 +439,10 @@ export default function Dashboard() {
                     ) : activeTab === 'Plate' ? (
                         <div>
                             <div className="flex justify-end space-x-2 mb-2">
-                                <button className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500 text-sm flex items-center gap-2 font-semibold">
+                                <button
+                                    className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500 text-sm flex items-center gap-2 font-semibold"
+                                    onClick={() => downloadCSV(tabData, 'plates_data.csv')}
+                                >
                                     <FaFileCsv className="text-lg" />
                                     Download CSV
                                 </button>
@@ -502,6 +520,15 @@ export default function Dashboard() {
                         </div>
                     ) : activeTab === 'Events' ? (
                         <div>
+                            <div className="flex justify-end space-x-2 mb-2">
+                                <button
+                                    className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500 text-sm flex items-center gap-2 font-semibold"
+                                    onClick={() => downloadCSV(tabData, 'events_data.csv')}
+                                >
+                                    <FaFileCsv className="text-lg" />
+                                    Download CSV
+                                </button>
+                            </div>
                             <div className="overflow-x-auto">
                                 <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
                                     <thead>
@@ -552,6 +579,15 @@ export default function Dashboard() {
                         </div>
                     ) : activeTab === 'Vehicules' ? (
                         <div>
+                            <div className="flex justify-end space-x-2 mb-2">
+                                <button
+                                    className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500 text-sm flex items-center gap-2 font-semibold"
+                                    onClick={() => downloadCSV(tabData, 'vehicules_data.csv')}
+                                >
+                                    <FaFileCsv className="text-lg" />
+                                    Download CSV
+                                </button>
+                            </div>
                             <div className="overflow-x-auto">
                                 <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
                                     <thead>
