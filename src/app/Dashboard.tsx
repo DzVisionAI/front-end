@@ -40,7 +40,9 @@ interface Plate {
         model: string | null;
         ownerId: number | null;
         registerAt: string;
+        signed_url?: string;
     };
+    signed_url?: string;
 }
 
 interface Event {
@@ -62,6 +64,7 @@ interface Vehicule {
     ownerId: number | null;
     plateNumber: string | null;
     registerAt: string;
+    signed_url?: string;
 }
 
 // Helper to convert local file path to browser path
@@ -92,6 +95,14 @@ export default function Dashboard() {
     const [tabData, setTabData] = useState<Plate[] | unknown[]>([]);
     const [tabLoading, setTabLoading] = useState(false);
     const [tabError, setTabError] = useState('');
+
+    // Pagination state for each tab
+    const [platesPage, setPlatesPage] = useState(1);
+    const [platesPagination, setPlatesPagination] = useState({ page: 1, pages: 1, total: 0, limit: 10 });
+    const [eventsPage, setEventsPage] = useState(1);
+    const [eventsPagination, setEventsPagination] = useState({ page: 1, pages: 1, total: 0, limit: 10 });
+    const [vehiculesPage, setVehiculesPage] = useState(1);
+    const [vehiculesPagination, setVehiculesPagination] = useState({ page: 1, pages: 1, total: 0, limit: 10 });
 
     const langRef = useRef<HTMLDivElement>(null);
     const settingsRef = useRef<HTMLDivElement>(null);
@@ -141,16 +152,39 @@ export default function Dashboard() {
     }
 
     useEffect(() => {
-        let fetcher: (() => Promise<Plate[]>) | null = null;
         setTabError('');
         setTabLoading(true);
-        if (activeTab === 'Plate') fetcher = tabService.getLicensePlates;
-        else if (activeTab === 'Events') fetcher = tabService.getEvents as () => Promise<Plate[]>;
-        else if (activeTab === 'Vehicules') fetcher = tabService.getVehicules as () => Promise<Plate[]>;
-        else if (activeTab === 'Drivers') fetcher = tabService.getDrivers as () => Promise<Plate[]>;
-        else if (activeTab === 'Cameras') fetcher = tabService.getCameras as () => Promise<Plate[]>;
-        if (fetcher) {
-            fetcher()
+        if (activeTab === 'Plate') {
+            tabService.getLicensePlates(platesPage, platesPagination.limit)
+                .then(res => {
+                    setTabData(Array.isArray(res.data) ? res.data : []);
+                    setPlatesPagination(res.pagination || platesPagination);
+                })
+                .catch(() => setTabError('Failed to load data.'))
+                .finally(() => setTabLoading(false));
+        } else if (activeTab === 'Events') {
+            tabService.getEvents(eventsPage, eventsPagination.limit)
+                .then(res => {
+                    setTabData(Array.isArray(res.data) ? res.data : []);
+                    setEventsPagination(res.pagination || eventsPagination);
+                })
+                .catch(() => setTabError('Failed to load data.'))
+                .finally(() => setTabLoading(false));
+        } else if (activeTab === 'Vehicules') {
+            tabService.getVehicules(vehiculesPage, vehiculesPagination.limit)
+                .then(res => {
+                    setTabData(Array.isArray(res.data) ? res.data : []);
+                    setVehiculesPagination(res.pagination || vehiculesPagination);
+                })
+                .catch(() => setTabError('Failed to load data.'))
+                .finally(() => setTabLoading(false));
+        } else if (activeTab === 'Drivers') {
+            tabService.getDrivers()
+                .then(data => setTabData(Array.isArray(data) ? data : []))
+                .catch(() => setTabError('Failed to load data.'))
+                .finally(() => setTabLoading(false));
+        } else if (activeTab === 'Cameras') {
+            tabService.getCameras()
                 .then(data => setTabData(Array.isArray(data) ? data : []))
                 .catch(() => setTabError('Failed to load data.'))
                 .finally(() => setTabLoading(false));
@@ -158,6 +192,12 @@ export default function Dashboard() {
             setTabData([]);
             setTabLoading(false);
         }
+    }, [activeTab, platesPage, eventsPage, vehiculesPage]);
+
+    useEffect(() => {
+        if (activeTab === 'Plate') setPlatesPage(1);
+        else if (activeTab === 'Events') setEventsPage(1);
+        else if (activeTab === 'Vehicules') setVehiculesPage(1);
     }, [activeTab]);
 
     // Logout function using authService
@@ -413,15 +453,15 @@ export default function Dashboard() {
                                                     <tr key={plate.id || idx} className="border-b border-gray-700 even:bg-gray-700/40 hover:bg-gray-700/60 transition">
                                                         <td className="px-3 py-2 align-middle font-semibold text-gray-100">{plate.plateNumber || '-'}</td>
                                                         <td className="px-3 py-2 align-middle">
-                                                            {(plate.vehicle?.image) ? (
-                                                                <img src={plate.vehicle?.image} alt="Vehicle" className="w-16 h-8 object-cover rounded mx-auto" />
+                                                            {(plate.vehicle?.signed_url) ? (
+                                                                <img src={plate.vehicle?.signed_url} alt="Vehicle" className="w-16 h-8 object-cover rounded mx-auto" />
                                                             ) : (
                                                                 <div className="w-16 h-8 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div>
                                                             )}
                                                         </td>
                                                         <td className="px-3 py-2 align-middle">
-                                                            {(plate.image) ? (
-                                                                <img src={(plate.image)} alt="Plate" className="w-12 h-6 object-cover rounded mx-auto" />
+                                                            {(plate.signed_url) ? (
+                                                                <img src={plate.signed_url} alt="Plate" className="w-12 h-6 object-cover rounded mx-auto" />
                                                             ) : (
                                                                 <div className="w-12 h-6 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div>
                                                             )}
@@ -441,6 +481,24 @@ export default function Dashboard() {
                                     </tbody>
                                 </table>
                             </div>
+                            {/* Pagination Controls */}
+                            <div className="flex justify-center mt-4">
+                                <button
+                                    onClick={() => setPlatesPage(p => Math.max(1, p - 1))}
+                                    disabled={platesPagination.page === 1}
+                                    className="px-3 py-1 mx-1 bg-gray-700 rounded disabled:opacity-50"
+                                >
+                                    Prev
+                                </button>
+                                <span className="px-3 py-1 mx-1">{platesPagination.page} / {platesPagination.pages}</span>
+                                <button
+                                    onClick={() => setPlatesPage(p => Math.min(platesPagination.pages, p + 1))}
+                                    disabled={platesPagination.page === platesPagination.pages}
+                                    className="px-3 py-1 mx-1 bg-gray-700 rounded disabled:opacity-50"
+                                >
+                                    Next
+                                </button>
+                            </div>
                         </div>
                     ) : activeTab === 'Events' ? (
                         <div>
@@ -448,28 +506,22 @@ export default function Dashboard() {
                                 <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
                                     <thead>
                                         <tr className="bg-gray-700 text-gray-300">
-                                            <th className="px-3 py-2 text-left">ID</th>
                                             <th className="px-3 py-2 text-left">Camera ID</th>
                                             <th className="px-3 py-2 text-left">Description</th>
-                                            <th className="px-3 py-2 text-left">Driver ID</th>
-                                            <th className="px-3 py-2 text-left">Plate ID</th>
                                             <th className="px-3 py-2 text-left">Time</th>
                                             <th className="px-3 py-2 text-left">Type</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {tabData.length === 0 ? (
-                                            <tr><td colSpan={7} className="text-center text-gray-400 py-4">No data found.</td></tr>
+                                            <tr><td colSpan={5} className="text-center text-gray-400 py-4">No data found.</td></tr>
                                         ) : (
                                             (tabData as Event[]).map((row, idx) => {
                                                 const event = row as Event;
                                                 return (
                                                     <tr key={event.id || idx} className="border-b border-gray-700 even:bg-gray-700/40 hover:bg-gray-700/60 transition">
-                                                        <td className="px-3 py-2 align-middle">{event.id}</td>
                                                         <td className="px-3 py-2 align-middle">{event.cameraId ?? '-'}</td>
                                                         <td className="px-3 py-2 align-middle">{event.description || '-'}</td>
-                                                        <td className="px-3 py-2 align-middle">{event.driverId ?? '-'}</td>
-                                                        <td className="px-3 py-2 align-middle">{event.plateId ?? '-'}</td>
                                                         <td className="px-3 py-2 align-middle">{event.time ? new Date(event.time).toLocaleString() : '-'}</td>
                                                         <td className="px-3 py-2 align-middle">{event.typeName || '-'}</td>
                                                     </tr>
@@ -479,6 +531,24 @@ export default function Dashboard() {
                                     </tbody>
                                 </table>
                             </div>
+                            {/* Pagination Controls */}
+                            <div className="flex justify-center mt-4">
+                                <button
+                                    onClick={() => setEventsPage(p => Math.max(1, p - 1))}
+                                    disabled={eventsPagination.page === 1}
+                                    className="px-3 py-1 mx-1 bg-gray-700 rounded disabled:opacity-50"
+                                >
+                                    Prev
+                                </button>
+                                <span className="px-3 py-1 mx-1">{eventsPagination.page} / {eventsPagination.pages}</span>
+                                <button
+                                    onClick={() => setEventsPage(p => Math.min(eventsPagination.pages, p + 1))}
+                                    disabled={eventsPagination.page === eventsPagination.pages}
+                                    className="px-3 py-1 mx-1 bg-gray-700 rounded disabled:opacity-50"
+                                >
+                                    Next
+                                </button>
+                            </div>
                         </div>
                     ) : activeTab === 'Vehicules' ? (
                         <div>
@@ -486,7 +556,6 @@ export default function Dashboard() {
                                 <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
                                     <thead>
                                         <tr className="bg-gray-700 text-gray-300">
-                                            <th className="px-3 py-2 text-left">ID</th>
                                             <th className="px-3 py-2 text-left">Image</th>
                                             <th className="px-3 py-2 text-left">Color</th>
                                             <th className="px-3 py-2 text-left">Make</th>
@@ -504,10 +573,9 @@ export default function Dashboard() {
                                                 const vehicule = row as Vehicule;
                                                 return (
                                                     <tr key={vehicule.id || idx} className="border-b border-gray-700 even:bg-gray-700/40 hover:bg-gray-700/60 transition">
-                                                        <td className="px-3 py-2 align-middle">{vehicule.id}</td>
                                                         <td className="px-3 py-2 align-middle">
-                                                            {vehicule.image ? (
-                                                                <img src={vehicule.image} alt="Vehicle" className="w-16 h-8 object-cover rounded mx-auto" />
+                                                            {vehicule.signed_url ? (
+                                                                <img src={vehicule.signed_url} alt="Vehicle" className="w-16 h-8 object-cover rounded mx-auto" />
                                                             ) : (
                                                                 <div className="w-16 h-8 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div>
                                                             )}
@@ -524,6 +592,24 @@ export default function Dashboard() {
                                         )}
                                     </tbody>
                                 </table>
+                            </div>
+                            {/* Pagination Controls */}
+                            <div className="flex justify-center mt-4">
+                                <button
+                                    onClick={() => setVehiculesPage(p => Math.max(1, p - 1))}
+                                    disabled={vehiculesPagination.page === 1}
+                                    className="px-3 py-1 mx-1 bg-gray-700 rounded disabled:opacity-50"
+                                >
+                                    Prev
+                                </button>
+                                <span className="px-3 py-1 mx-1">{vehiculesPagination.page} / {vehiculesPagination.pages}</span>
+                                <button
+                                    onClick={() => setVehiculesPage(p => Math.min(vehiculesPagination.pages, p + 1))}
+                                    disabled={vehiculesPagination.page === vehiculesPagination.pages}
+                                    className="px-3 py-1 mx-1 bg-gray-700 rounded disabled:opacity-50"
+                                >
+                                    Next
+                                </button>
                             </div>
                         </div>
                     ) : (
