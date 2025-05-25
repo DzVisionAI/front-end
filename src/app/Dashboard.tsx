@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Logo from './ui/logo';
 import Footer from './ui/footer';
-import { FaUser, FaUsers, FaBan, FaEdit, FaTrash, FaSignOutAlt, FaChevronDown, FaUserEdit, FaVideo, FaIdCard, FaCalendarAlt, FaClock, FaImage, FaKey } from 'react-icons/fa';
+import { FaUser, FaUsers, FaBan, FaEdit, FaTrash, FaSignOutAlt, FaChevronDown, FaUserEdit, FaVideo, FaIdCard, FaCalendarAlt, FaClock, FaImage, FaKey, FaSortUp, FaSortDown, FaArrowLeft, FaArrowRight } from 'react-icons/fa';
 import { FaFileCsv } from "react-icons/fa";
 import { useRouter } from 'next/navigation';
 import { authService } from '@/app/services/auth';
@@ -13,6 +13,7 @@ import { tabService } from './services/tabService';
 import * as XLSX from 'xlsx';
 import { videoService } from './services/videoService';
 import { useNotificationStore } from './lib/store';
+import DropdownNotifications from '../components/dropdown-notifications';
 
 const tabs = [
     { name: 'Plate' },
@@ -20,12 +21,6 @@ const tabs = [
     { name: 'Vehicules' },
     { name: 'Drivers' },
     { name: 'Cameras' },
-];
-
-const languages = [
-    { code: 'en', label: 'English', flag: '🇬🇧' },
-    { code: 'fr', label: 'Français', flag: '🇫🇷' },
-    { code: 'ar', label: 'العربية', flag: '🇩🇿' },
 ];
 
 // Define Plate type
@@ -148,11 +143,22 @@ function ProcessingLoader({ message = 'Processing, please wait...' }) {
     );
 }
 
+// Define Alert type
+interface Alert {
+    id: number;
+    acknowledged: boolean;
+    event: {
+        description: string;
+        plateNumber: string;
+    };
+    eventId: number;
+    status: string;
+    time: string;
+}
+
 export default function Dashboard() {
     const [activeTab, setActiveTab] = useState('Plate');
-    const [langOpen, setLangOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
-    const [selectedLang, setSelectedLang] = useState(languages[0]);
     const user = useUserStore(state => state.user);
     const setUser = useUserStore(state => state.setUser);
     const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -180,16 +186,30 @@ export default function Dashboard() {
     const [processLoading, setProcessLoading] = useState(false);
     const [processResult, setProcessResult] = useState<DetectionResult | null>(null);
 
-    const langRef = useRef<HTMLDivElement>(null);
+    // Add state for modals and editing
+    const [editPlateModal, setEditPlateModal] = useState<{ open: boolean; plate: Plate | null }>({ open: false, plate: null });
+    const [editVehiculeModal, setEditVehiculeModal] = useState<{ open: boolean; vehicule: Vehicule | null }>({ open: false, vehicule: null });
+    const [editPlateNumber, setEditPlateNumber] = useState('');
+    const [editVehiculeFields, setEditVehiculeFields] = useState({ make: '', color: '', model: '' });
+    const [editLoading, setEditLoading] = useState(false);
+
+    // Alert state (instead of notifications)
+    const [alerts, setAlerts] = useState<Alert[]>([]);
+    const [unacknowledgedCount, setUnacknowledgedCount] = useState(0);
+
     const settingsRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     const addNotification = useNotificationStore(state => state.addNotification);
 
+    const [plateSearch, setPlateSearch] = useState('');
+    const [plateSort, setPlateSort] = useState<{ field: string; direction: 'asc' | 'desc' }>({ field: '', direction: 'asc' });
+    const [vehiculeSort, setVehiculeSort] = useState<{ field: string; direction: 'asc' | 'desc' }>({ field: '', direction: 'asc' });
+
+    // Add state for vehicule search
+    const [vehiculeSearch, setVehiculeSearch] = useState('');
+
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
-            if (langRef.current && !langRef.current.contains(event.target as Node)) {
-                setLangOpen(false);
-            }
             if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
                 setSettingsOpen(false);
             }
@@ -375,6 +395,124 @@ export default function Dashboard() {
         }
     };
 
+    // Handler for opening plate edit modal
+    const handleOpenEditPlate = (plate: Plate) => {
+        setEditPlateModal({ open: true, plate });
+        setEditPlateNumber(plate.plateNumber || '');
+    };
+    // Handler for opening vehicule edit modal
+    const handleOpenEditVehicule = (vehicule: Vehicule) => {
+        setEditVehiculeModal({ open: true, vehicule });
+        setEditVehiculeFields({
+            make: vehicule.make || '',
+            color: vehicule.color || '',
+            model: vehicule.model || '',
+        });
+    };
+    // Handler for saving plate edit
+    const handleSaveEditPlate = async () => {
+        if (!editPlateModal.plate) return;
+        setEditLoading(true);
+        try {
+            await tabService.updateLicensePlate(editPlateModal.plate.id, { plateNumber: editPlateNumber });
+            setEditPlateModal({ open: false, plate: null });
+            setEditPlateNumber('');
+            // Refresh data
+            tabService.getLicensePlates(platesPage, platesPagination.limit)
+                .then(res => {
+                    setTabData(Array.isArray(res.data) ? res.data : []);
+                    setPlatesPagination(res.pagination || platesPagination);
+                });
+            addNotification({ type: 'success', message: 'Plate updated successfully.' });
+        } catch {
+            addNotification({ type: 'error', message: 'Failed to update plate.' });
+        } finally {
+            setEditLoading(false);
+        }
+    };
+    // Handler for saving vehicule edit
+    const handleSaveEditVehicule = async () => {
+        if (!editVehiculeModal.vehicule) return;
+        setEditLoading(true);
+        try {
+            await tabService.updateVehicle(editVehiculeModal.vehicule.id, editVehiculeFields);
+            setEditVehiculeModal({ open: false, vehicule: null });
+            setEditVehiculeFields({ make: '', color: '', model: '' });
+            // Refresh data
+            tabService.getVehicules(vehiculesPage, vehiculesPagination.limit)
+                .then(res => {
+                    setTabData(Array.isArray(res.data) ? res.data : []);
+                    setVehiculesPagination(res.pagination || vehiculesPagination);
+                });
+            addNotification({ type: 'success', message: 'Vehicule updated successfully.' });
+        } catch {
+            addNotification({ type: 'error', message: 'Failed to update vehicule.' });
+        } finally {
+            setEditLoading(false);
+        }
+    };
+    // Handler for deleting plate
+    const handleDeletePlate = async (plate: Plate) => {
+        if (!window.confirm('Are you sure you want to delete this plate?')) return;
+        setEditLoading(true);
+        try {
+            await tabService.deleteLicensePlate(plate.id);
+            // Refresh data
+            tabService.getLicensePlates(platesPage, platesPagination.limit)
+                .then(res => {
+                    setTabData(Array.isArray(res.data) ? res.data : []);
+                    setPlatesPagination(res.pagination || platesPagination);
+                });
+            addNotification({ type: 'success', message: 'Plate deleted successfully.' });
+        } catch {
+            addNotification({ type: 'error', message: 'Failed to delete plate.' });
+        } finally {
+            setEditLoading(false);
+        }
+    };
+    // Handler for deleting vehicule
+    const handleDeleteVehicule = async (vehicule: Vehicule) => {
+        if (!window.confirm('Are you sure you want to delete this vehicule?')) return;
+        setEditLoading(true);
+        try {
+            await tabService.deleteVehicle(vehicule.id);
+            // Refresh data
+            tabService.getVehicules(vehiculesPage, vehiculesPagination.limit)
+                .then(res => {
+                    setTabData(Array.isArray(res.data) ? res.data : []);
+                    setVehiculesPagination(res.pagination || vehiculesPagination);
+                });
+            addNotification({ type: 'success', message: 'Vehicule deleted successfully.' });
+        } catch {
+            addNotification({ type: 'error', message: 'Failed to delete vehicule.' });
+        } finally {
+            setEditLoading(false);
+        }
+    };
+
+    // Fetch alerts
+    useEffect(() => {
+        tabService.getAlerts().then((data) => {
+            const alertList: Alert[] = Array.isArray(data.data) ? data.data : [];
+            setAlerts(alertList);
+            setUnacknowledgedCount(alertList.filter((a) => !a.acknowledged).length);
+        });
+    }, []);
+
+    // Acknowledge alert
+    const handleAcknowledgeAlert = async (alertId: number) => {
+        await tabService.acknowledgeAlert(alertId);
+        setAlerts((prev) => prev.map((a) => a.id === alertId ? { ...a, acknowledged: true } : a));
+        setUnacknowledgedCount((prev) => Math.max(0, prev - 1));
+    };
+
+    // Acknowledge all when dropdown is opened
+    const handleDropdownOpen = () => {
+        alerts.forEach((a) => {
+            if (!a.acknowledged) handleAcknowledgeAlert(a.id);
+        });
+    };
+
     return (
         <div className="min-h-screen flex flex-col bg-gray-900 text-gray-200 font-inter">
             {/* Header */}
@@ -384,29 +522,14 @@ export default function Dashboard() {
                     <span className="ml-3 text-xl font-bold tracking-tight text-indigo-400 hidden sm:inline">Dashboard</span>
                 </div>
                 <div className="flex items-center space-x-4">
-                    {/* Language Selector */}
-                    <div className="relative" ref={langRef}>
-                        <button
-                            className="flex items-center px-3 py-2 bg-gray-700 rounded hover:bg-gray-600 focus:outline-none"
-                            onClick={() => setLangOpen((open) => !open)}
-                        >
-                            <span className="mr-1">{selectedLang.flag}</span>
-                            <FaChevronDown className="text-xs" />
-                        </button>
-                        {langOpen && (
-                            <div className="absolute right-0 mt-2 w-36 bg-gray-800 border border-gray-700 rounded shadow-lg z-20">
-                                {languages.map((lang) => (
-                                    <button
-                                        key={lang.code}
-                                        className={`flex items-center w-full px-4 py-2 hover:bg-gray-700 ${selectedLang.code === lang.code ? 'text-indigo-400' : ''}`}
-                                        onClick={() => { setSelectedLang(lang); setLangOpen(false); }}
-                                    >
-                                        <span className="mr-2">{lang.flag}</span> {lang.label}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    {/* Notifications Dropdown */}
+                    <DropdownNotifications
+                        align="right"
+                        notifications={alerts}
+                        unreadCount={unacknowledgedCount}
+                        onNotificationClick={handleAcknowledgeAlert}
+                        onDropdownOpen={handleDropdownOpen}
+                    />
                     {/* Settings Dropdown */}
                     <div className="relative group" ref={settingsRef}>
                         <button className="flex items-center px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 focus:outline-none" onClick={() => setSettingsOpen((open) => !open)}>
@@ -636,7 +759,16 @@ export default function Dashboard() {
                         <div className="text-center text-red-400 py-8">{tabError}</div>
                     ) : activeTab === 'Plate' ? (
                         <div>
-                            <div className="flex justify-end space-x-2 mb-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
+                                <div className="flex-1">
+                                    <input
+                                        type="text"
+                                        placeholder="Search Plate Number..."
+                                        className="w-full sm:w-64 px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none border border-gray-600"
+                                        value={plateSearch}
+                                        onChange={e => setPlateSearch(e.target.value)}
+                                    />
+                                </div>
                                 <button
                                     className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500 text-sm flex items-center gap-2 font-semibold"
                                     onClick={() => downloadCSV(tabData, 'plates_data.csv')}
@@ -649,11 +781,26 @@ export default function Dashboard() {
                                 <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
                                     <thead>
                                         <tr className="bg-gray-700 text-gray-300">
-                                            <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaIdCard />PLATE NUMBER</span></th>
+                                            <th className="px-3 py-2 text-left cursor-pointer select-none" onClick={() => setPlateSort(s => ({ field: 'plateNumber', direction: s.field === 'plateNumber' && s.direction === 'asc' ? 'desc' : 'asc' }))}>
+                                                <span className="flex items-center gap-1">
+                                                    <FaIdCard />PLATE NUMBER
+                                                    {plateSort.field === 'plateNumber' && (plateSort.direction === 'asc' ? <FaSortUp className="ml-1" /> : <FaSortDown className="ml-1" />)}
+                                                </span>
+                                            </th>
                                             <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaImage />CAR IMAGE</span></th>
                                             <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaImage />PLATE IMAGE</span></th>
-                                            <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaCalendarAlt />DATE</span></th>
-                                            <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaClock />TIME</span></th>
+                                            <th className="px-3 py-2 text-left cursor-pointer select-none" onClick={() => setPlateSort(s => ({ field: 'date', direction: s.field === 'date' && s.direction === 'asc' ? 'desc' : 'asc' }))}>
+                                                <span className="flex items-center gap-1">
+                                                    <FaCalendarAlt />DATE
+                                                    {plateSort.field === 'date' && (plateSort.direction === 'asc' ? <FaSortUp className="ml-1" /> : <FaSortDown className="ml-1" />)}
+                                                </span>
+                                            </th>
+                                            <th className="px-3 py-2 text-left cursor-pointer select-none" onClick={() => setPlateSort(s => ({ field: 'time', direction: s.field === 'time' && s.direction === 'asc' ? 'desc' : 'asc' }))}>
+                                                <span className="flex items-center gap-1">
+                                                    <FaClock />TIME
+                                                    {plateSort.field === 'time' && (plateSort.direction === 'asc' ? <FaSortUp className="ml-1" /> : <FaSortDown className="ml-1" />)}
+                                                </span>
+                                            </th>
                                             <th className="px-3 py-2 text-left">Driver</th>
                                             <th className="px-3 py-2 text-left"><span className="flex items-center gap-1"><FaVideo />CAMERAS</span></th>
                                             <th className="px-3 py-2 text-center">ACTIONS</th>
@@ -663,36 +810,58 @@ export default function Dashboard() {
                                         {tabData.length === 0 ? (
                                             <tr><td colSpan={8} className="text-center text-gray-400 py-4">No data found.</td></tr>
                                         ) : (
-                                            (tabData as Plate[]).map((row, idx) => {
-                                                const plate = row as Plate;
-                                                return (
-                                                    <tr key={plate.id || idx} className="border-b border-gray-700 even:bg-gray-700/40 hover:bg-gray-700/60 transition">
-                                                        <td className="px-3 py-2 align-middle font-semibold text-gray-100">{plate.plateNumber || '-'}</td>
-                                                        <td className="px-3 py-2 align-middle">
-                                                            {(plate.vehicle?.signed_url) ? (
-                                                                <img src={plate.vehicle?.signed_url} alt="Vehicle" className="w-16 h-8 object-cover rounded mx-auto" />
-                                                            ) : (
-                                                                <div className="w-16 h-8 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-3 py-2 align-middle">
-                                                            {(plate.signed_url) ? (
-                                                                <img src={plate.signed_url} alt="Plate" className="w-12 h-6 object-cover rounded mx-auto" />
-                                                            ) : (
-                                                                <div className="w-12 h-6 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-3 py-2 align-middle">{plate.detectedAt ? new Date(plate.detectedAt).toLocaleDateString() : '-'}</td>
-                                                        <td className="px-3 py-2 align-middle">{plate.detectedAt ? new Date(plate.detectedAt).toLocaleTimeString() : '-'}</td>
-                                                        <td className="px-3 py-2 align-middle">-</td>
-                                                        <td className="px-3 py-2 align-middle">{plate.cameraId ?? '-'}</td>
-                                                        <td className="px-3 py-2 align-middle flex space-x-2 justify-center">
-                                                            <button className="text-blue-400 hover:text-blue-200 p-1" title="Edit"><FaUserEdit /></button>
-                                                            <button className="text-red-400 hover:text-red-200 p-1" title="Delete"><FaTrash /></button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
+                                            (tabData as Plate[])
+                                                .filter(plate => plate.plateNumber?.toLowerCase().includes(plateSearch.toLowerCase()))
+                                                .sort((a, b) => {
+                                                    if (plateSort.field === 'plateNumber') {
+                                                        return plateSort.direction === 'asc'
+                                                            ? (a.plateNumber || '').localeCompare(b.plateNumber || '')
+                                                            : (b.plateNumber || '').localeCompare(a.plateNumber || '');
+                                                    }
+                                                    if (plateSort.field === 'date') {
+                                                        return plateSort.direction === 'asc'
+                                                            ? new Date(a.detectedAt).getTime() - new Date(b.detectedAt).getTime()
+                                                            : new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime();
+                                                    }
+                                                    if (plateSort.field === 'time') {
+                                                        // Sort by time only (ignoring date)
+                                                        const getTime = (d: string) => d ? new Date(d).getHours() * 60 + new Date(d).getMinutes() : 0;
+                                                        return plateSort.direction === 'asc'
+                                                            ? getTime(a.detectedAt) - getTime(b.detectedAt)
+                                                            : getTime(b.detectedAt) - getTime(a.detectedAt);
+                                                    }
+                                                    return 0;
+                                                })
+                                                .map((row, idx) => {
+                                                    const plate = row as Plate;
+                                                    return (
+                                                        <tr key={plate.id || idx} className="border-b border-gray-700 even:bg-gray-700/40 hover:bg-gray-700/60 transition">
+                                                            <td className="px-3 py-2 align-middle font-semibold text-gray-100">{plate.plateNumber || '-'}</td>
+                                                            <td className="px-3 py-2 align-middle">
+                                                                {(plate.vehicle?.signed_url) ? (
+                                                                    <img src={plate.vehicle?.signed_url} alt="Vehicle" className="w-16 h-8 object-cover rounded mx-auto" />
+                                                                ) : (
+                                                                    <div className="w-16 h-8 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-3 py-2 align-middle">
+                                                                {(plate.signed_url) ? (
+                                                                    <img src={plate.signed_url} alt="Plate" className="w-12 h-6 object-cover rounded mx-auto" />
+                                                                ) : (
+                                                                    <div className="w-12 h-6 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-3 py-2 align-middle">{plate.detectedAt ? new Date(plate.detectedAt).toLocaleDateString() : '-'}</td>
+                                                            <td className="px-3 py-2 align-middle">{plate.detectedAt ? new Date(plate.detectedAt).toLocaleTimeString() : '-'}</td>
+                                                            <td className="px-3 py-2 align-middle">-</td>
+                                                            <td className="px-3 py-2 align-middle">{plate.cameraId ?? '-'}</td>
+                                                            <td className="px-3 py-2 align-middle flex space-x-2 justify-center">
+                                                                <button className="text-blue-400 hover:text-blue-200 p-1" title="Edit" onClick={() => handleOpenEditPlate(plate)}><FaUserEdit /></button>
+                                                                <button className="text-red-400 hover:text-red-200 p-1" title="Delete" onClick={() => handleDeletePlate(plate)}><FaTrash /></button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
                                         )}
                                     </tbody>
                                 </table>
@@ -702,17 +871,17 @@ export default function Dashboard() {
                                 <button
                                     onClick={() => setPlatesPage(p => Math.max(1, p - 1))}
                                     disabled={platesPagination.page === 1}
-                                    className="px-3 py-1 mx-1 bg-gray-700 rounded disabled:opacity-50"
+                                    className="px-3 py-1 mx-1 rounded disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-500"
                                 >
-                                    Prev
+                                    <FaArrowLeft />
                                 </button>
                                 <span className="px-3 py-1 mx-1">{platesPagination.page} / {platesPagination.pages}</span>
                                 <button
                                     onClick={() => setPlatesPage(p => Math.min(platesPagination.pages, p + 1))}
                                     disabled={platesPagination.page === platesPagination.pages}
-                                    className="px-3 py-1 mx-1 bg-gray-700 rounded disabled:opacity-50"
+                                    className="px-3 py-1 mx-1 rounded disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-500"
                                 >
-                                    Next
+                                    <FaArrowRight />
                                 </button>
                             </div>
                         </div>
@@ -777,7 +946,16 @@ export default function Dashboard() {
                         </div>
                     ) : activeTab === 'Vehicules' ? (
                         <div>
-                            <div className="flex justify-end space-x-2 mb-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
+                                <div className="flex-1">
+                                    <input
+                                        type="text"
+                                        placeholder="Search Plate Number..."
+                                        className="w-full sm:w-64 px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none border border-gray-600"
+                                        value={vehiculeSearch}
+                                        onChange={e => setVehiculeSearch(e.target.value)}
+                                    />
+                                </div>
                                 <button
                                     className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500 text-sm flex items-center gap-2 font-semibold"
                                     onClick={() => downloadCSV(tabData, 'vehicules_data.csv')}
@@ -795,34 +973,64 @@ export default function Dashboard() {
                                             <th className="px-3 py-2 text-left">Make</th>
                                             <th className="px-3 py-2 text-left">Model</th>
                                             <th className="px-3 py-2 text-left">Owner ID</th>
-                                            <th className="px-3 py-2 text-left">Plate Number</th>
-                                            <th className="px-3 py-2 text-left">Register At</th>
+                                            <th className="px-3 py-2 text-left cursor-pointer select-none" onClick={() => setVehiculeSort(s => ({ field: 'plateNumber', direction: s.field === 'plateNumber' && s.direction === 'asc' ? 'desc' : 'asc' }))}>
+                                                <span className="flex items-center gap-1">
+                                                    Plate Number
+                                                    {vehiculeSort.field === 'plateNumber' && (vehiculeSort.direction === 'asc' ? <FaSortUp className="ml-1" /> : <FaSortDown className="ml-1" />)}
+                                                </span>
+                                            </th>
+                                            <th className="px-3 py-2 text-left cursor-pointer select-none" onClick={() => setVehiculeSort(s => ({ field: 'registerAt', direction: s.field === 'registerAt' && s.direction === 'asc' ? 'desc' : 'asc' }))}>
+                                                <span className="flex items-center gap-1">
+                                                    Register At
+                                                    {vehiculeSort.field === 'registerAt' && (vehiculeSort.direction === 'asc' ? <FaSortUp className="ml-1" /> : <FaSortDown className="ml-1" />)}
+                                                </span>
+                                            </th>
+                                            <th className="px-3 py-2 text-center">ACTIONS</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {tabData.length === 0 ? (
                                             <tr><td colSpan={8} className="text-center text-gray-400 py-4">No data found.</td></tr>
                                         ) : (
-                                            (tabData as Vehicule[]).map((row, idx) => {
-                                                const vehicule = row as Vehicule;
-                                                return (
-                                                    <tr key={vehicule.id || idx} className="border-b border-gray-700 even:bg-gray-700/40 hover:bg-gray-700/60 transition">
-                                                        <td className="px-3 py-2 align-middle">
-                                                            {vehicule.signed_url ? (
-                                                                <img src={vehicule.signed_url} alt="Vehicle" className="w-16 h-8 object-cover rounded mx-auto" />
-                                                            ) : (
-                                                                <div className="w-16 h-8 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-3 py-2 align-middle">{vehicule.color || '-'}</td>
-                                                        <td className="px-3 py-2 align-middle">{vehicule.make || '-'}</td>
-                                                        <td className="px-3 py-2 align-middle">{vehicule.model || '-'}</td>
-                                                        <td className="px-3 py-2 align-middle">{vehicule.ownerId ?? '-'}</td>
-                                                        <td className="px-3 py-2 align-middle">{vehicule.plateNumber || '-'}</td>
-                                                        <td className="px-3 py-2 align-middle">{vehicule.registerAt ? new Date(vehicule.registerAt).toLocaleDateString() : '-'}</td>
-                                                    </tr>
-                                                );
-                                            })
+                                            (tabData as Vehicule[])
+                                                .filter(vehicule => vehicule.plateNumber?.toLowerCase().includes(vehiculeSearch.toLowerCase()))
+                                                .sort((a, b) => {
+                                                    if (vehiculeSort.field === 'plateNumber') {
+                                                        return vehiculeSort.direction === 'asc'
+                                                            ? (a.plateNumber || '').localeCompare(b.plateNumber || '')
+                                                            : (b.plateNumber || '').localeCompare(a.plateNumber || '');
+                                                    }
+                                                    if (vehiculeSort.field === 'registerAt') {
+                                                        return vehiculeSort.direction === 'asc'
+                                                            ? new Date(a.registerAt).getTime() - new Date(b.registerAt).getTime()
+                                                            : new Date(b.registerAt).getTime() - new Date(a.registerAt).getTime();
+                                                    }
+                                                    return 0;
+                                                })
+                                                .map((row, idx) => {
+                                                    const vehicule = row as Vehicule;
+                                                    return (
+                                                        <tr key={vehicule.id || idx} className="border-b border-gray-700 even:bg-gray-700/40 hover:bg-gray-700/60 transition">
+                                                            <td className="px-3 py-2 align-middle">
+                                                                {vehicule.signed_url ? (
+                                                                    <img src={vehicule.signed_url} alt="Vehicle" className="w-16 h-8 object-cover rounded mx-auto" />
+                                                                ) : (
+                                                                    <div className="w-16 h-8 bg-gray-600 rounded mx-auto flex items-center justify-center"><FaImage className="text-gray-400" /></div>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-3 py-2 align-middle">{vehicule.color || '-'}</td>
+                                                            <td className="px-3 py-2 align-middle">{vehicule.make || '-'}</td>
+                                                            <td className="px-3 py-2 align-middle">{vehicule.model || '-'}</td>
+                                                            <td className="px-3 py-2 align-middle">{vehicule.ownerId ?? '-'}</td>
+                                                            <td className="px-3 py-2 align-middle">{vehicule.plateNumber || '-'}</td>
+                                                            <td className="px-3 py-2 align-middle">{vehicule.registerAt ? new Date(vehicule.registerAt).toLocaleDateString() : '-'}</td>
+                                                            <td className="px-3 py-2 align-middle flex space-x-2 justify-center">
+                                                                <button className="text-blue-400 hover:text-blue-200 p-1" title="Edit" onClick={() => handleOpenEditVehicule(vehicule)}><FaUserEdit /></button>
+                                                                <button className="text-red-400 hover:text-red-200 p-1" title="Delete" onClick={() => handleDeleteVehicule(vehicule)}><FaTrash /></button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
                                         )}
                                     </tbody>
                                 </table>
@@ -832,17 +1040,17 @@ export default function Dashboard() {
                                 <button
                                     onClick={() => setVehiculesPage(p => Math.max(1, p - 1))}
                                     disabled={vehiculesPagination.page === 1}
-                                    className="px-3 py-1 mx-1 bg-gray-700 rounded disabled:opacity-50"
+                                    className="px-3 py-1 mx-1 rounded disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-500"
                                 >
-                                    Prev
+                                    <FaArrowLeft />
                                 </button>
                                 <span className="px-3 py-1 mx-1">{vehiculesPagination.page} / {vehiculesPagination.pages}</span>
                                 <button
                                     onClick={() => setVehiculesPage(p => Math.min(vehiculesPagination.pages, p + 1))}
                                     disabled={vehiculesPagination.page === vehiculesPagination.pages}
-                                    className="px-3 py-1 mx-1 bg-gray-700 rounded disabled:opacity-50"
+                                    className="px-3 py-1 mx-1 rounded disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-500"
                                 >
-                                    Next
+                                    <FaArrowRight />
                                 </button>
                             </div>
                         </div>
@@ -852,6 +1060,53 @@ export default function Dashboard() {
                 </section>
             </main>
             <Footer />
+
+            {/* Plate Edit Modal */}
+            {editPlateModal.open && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6 relative">
+                        <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-200" onClick={() => setEditPlateModal({ open: false, plate: null })}>&times;</button>
+                        <h2 className="text-xl font-bold text-indigo-300 mb-4 text-center">Edit Plate</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-gray-200 text-sm mb-1">Plate Number</label>
+                                <input type="text" className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none" value={editPlateNumber} onChange={e => setEditPlateNumber(e.target.value)} required />
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                                <button className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 text-gray-200 font-semibold" onClick={() => setEditPlateModal({ open: false, plate: null })}>Cancel</button>
+                                <button className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold" onClick={handleSaveEditPlate} disabled={editLoading}>{editLoading ? 'Saving...' : 'Save'}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Vehicule Edit Modal */}
+            {editVehiculeModal.open && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6 relative">
+                        <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-200" onClick={() => setEditVehiculeModal({ open: false, vehicule: null })}>&times;</button>
+                        <h2 className="text-xl font-bold text-indigo-300 mb-4 text-center">Edit Vehicule</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-gray-200 text-sm mb-1">Make</label>
+                                <input type="text" className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none" value={editVehiculeFields.make} onChange={e => setEditVehiculeFields(f => ({ ...f, make: e.target.value }))} />
+                            </div>
+                            <div>
+                                <label className="block text-gray-200 text-sm mb-1">Color</label>
+                                <input type="text" className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none" value={editVehiculeFields.color} onChange={e => setEditVehiculeFields(f => ({ ...f, color: e.target.value }))} />
+                            </div>
+                            <div>
+                                <label className="block text-gray-200 text-sm mb-1">Model</label>
+                                <input type="text" className="w-full px-3 py-2 rounded bg-gray-700 text-gray-200 focus:outline-none" value={editVehiculeFields.model} onChange={e => setEditVehiculeFields(f => ({ ...f, model: e.target.value }))} />
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                                <button className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 text-gray-200 font-semibold" onClick={() => setEditVehiculeModal({ open: false, vehicule: null })}>Cancel</button>
+                                <button className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold" onClick={handleSaveEditVehicule} disabled={editLoading}>{editLoading ? 'Saving...' : 'Save'}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 } 
