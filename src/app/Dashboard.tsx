@@ -159,7 +159,7 @@ interface Alert {
 export default function Dashboard() {
     const [activeTab, setActiveTab] = useState('Plate');
     const [settingsOpen, setSettingsOpen] = useState(false);
-    const user = useUserStore(state => state.user);
+        const user = useUserStore(state => state.user);
     const setUser = useUserStore(state => state.setUser);
     const [profileModalOpen, setProfileModalOpen] = useState(false);
     const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
