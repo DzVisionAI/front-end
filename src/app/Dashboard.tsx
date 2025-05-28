@@ -14,6 +14,8 @@ import * as XLSX from 'xlsx';
 import { videoService } from './services/videoService';
 import { useNotificationStore } from './lib/store';
 import DropdownNotifications from '../components/dropdown-notifications';
+import { io, Socket } from 'socket.io-client';
+import { flushSync } from 'react-dom';
 
 const tabs = [
     { name: 'Plate' },
@@ -92,30 +94,26 @@ function downloadCSV(data: any[], filename: string) {
     window.URL.revokeObjectURL(url);
 }
 
-// Type for detection result
-type DetectionResult = {
-    detections?: Array<{
-        detection_time: string;
-        frame_number: number;
-        license_plate: {
-            gcs_url: string;
-            id: number;
-            image_path: string;
-            number: string;
-            signed_url: string;
-        };
-        success: boolean;
-        vehicle: {
-            color: string | null;
-            gcs_url: string;
-            id: number;
-            image_path: string;
-            plate_number: string;
-            signed_url: string;
-        };
-    }>;
-    message?: string;
-    success?: boolean;
+// Add this type above the Dashboard component
+type DetectionType = {
+    detection_time: string;
+    frame_number: number;
+    license_plate: {
+        gcs_url: string;
+        id: number;
+        image_path: string;
+        number: string;
+        signed_url: string;
+    };
+    success: boolean;
+    vehicle: {
+        color: string | null;
+        gcs_url: string;
+        id: number;
+        image_path: string;
+        plate_number: string;
+        signed_url: string;
+    };
 };
 
 // Simple animated dots loader
@@ -184,7 +182,7 @@ export default function Dashboard() {
     const [uploadPreview, setUploadPreview] = useState<string | null>(null); // for thumbnail/image
     const [uploadLoading, setUploadLoading] = useState(false);
     const [processLoading, setProcessLoading] = useState(false);
-    const [processResult, setProcessResult] = useState<DetectionResult | null>(null);
+    const socketRef = useRef<Socket | null>(null);
 
     // Add state for modals and editing
     const [editPlateModal, setEditPlateModal] = useState<{ open: boolean; plate: Plate | null }>({ open: false, plate: null });
@@ -207,6 +205,9 @@ export default function Dashboard() {
 
     // Add state for vehicule search
     const [vehiculeSearch, setVehiculeSearch] = useState('');
+
+    // Replace detectionResults state with a single detectionResult
+    const [detectionResult, setDetectionResult] = useState<DetectionType | null>(null);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -341,7 +342,7 @@ export default function Dashboard() {
         setUploadedFilename(null);
         setUploadPreview(null);
         setUploadLoading(true);
-        setProcessResult(null);
+        setDetectionResult(null);
         addNotification({ type: 'info', message: 'Uploading media...' });
         try {
             let data;
@@ -368,32 +369,123 @@ export default function Dashboard() {
         setUploadType(null);
         setUploadedFilename(null);
         setUploadPreview(null);
-        setProcessResult(null);
+        setDetectionResult(null);
     };
 
     const handleProcessUpload = async () => {
         if (!uploadedFilename || !uploadType) return;
         setProcessLoading(true);
-        setProcessResult(null);
-        try {
-            let data: DetectionResult;
-            if (uploadType === 'image') {
-                data = await videoService.processImage(uploadedFilename);
-            } else {
-                data = await videoService.processVideo(uploadedFilename);
+        setDetectionResult(null);
+        if (uploadType === 'image') {
+            try {
+                const data = await videoService.processImage(uploadedFilename);
+                if (Array.isArray(data.detections)) {
+                    data.detections.forEach((det: DetectionType) =>
+                        setDetectionResult(det)
+                    );
+                }
+                if (data && data.success) {
+                    addNotification({ type: 'success', message: data.message || 'Process succeeded.' });
+                    // Re-fetch plates after image process
+                    tabService.getLicensePlates(platesPage, platesPagination.limit)
+                        .then(res => {
+                            setTabData(Array.isArray(res.data) ? res.data : []);
+                            setPlatesPagination(res.pagination || platesPagination);
+                        });
+                    // Re-fetch alerts after image process
+                    tabService.getAlerts().then((data) => {
+                        const alertList: Alert[] = Array.isArray(data.data) ? data.data : [];
+                        setAlerts(alertList);
+                        setUnacknowledgedCount(alertList.filter((a) => !a.acknowledged).length);
+                    });
+                } else {
+                    addNotification({ type: 'error', message: data && data.message ? data.message : 'Process failed.' });
+                }
+            } catch {
+                addNotification({ type: 'error', message: 'Failed to process upload.' });
+            } finally {
+                setProcessLoading(false);
             }
-            setProcessResult(data);
-            if (data && data.success) {
-                addNotification({ type: 'success', message: data.message || 'Process succeeded.' });
-            } else {
-                addNotification({ type: 'error', message: data && data.message ? data.message : 'Process failed.' });
+        } else {
+            // Video: use persistent socket
+            if (socketRef.current) {
+                socketRef.current.emit('start_processing', { filename: uploadedFilename });
             }
-        } catch {
-            addNotification({ type: 'error', message: 'Failed to process upload.' });
-        } finally {
-            setProcessLoading(false);
         }
     };
+
+    // Persistent socket connection for Dashboard lifetime
+    useEffect(() => {
+        const socket = io('ws://localhost:5000/video', { transports: ['websocket'] });
+        socketRef.current = socket;
+
+        socket.on('connect', () => {
+            console.log('[Socket] Connected');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('[Socket] Disconnected');
+        });
+
+        socket.on('video_event', (msg: unknown) => {
+            let parsedMsg = msg;
+            if (typeof msg === 'string') {
+                try {
+                    parsedMsg = JSON.parse(msg);
+                } catch (e) {
+                    console.error('[Socket] Failed to parse message:', msg, e);
+                    return;
+                }
+            }
+            console.log('[Socket] Parsed message:', parsedMsg);
+            const eventType = String((parsedMsg as any).type).trim();
+            if (eventType === 'progress') {
+                // Handle progress update
+            } else if (eventType === 'detection') {
+                console.log('[Socket] Adding detection:', (parsedMsg as any).data);
+                flushSync(() => {
+                    setDetectionResult({ ...((parsedMsg as any).data as DetectionType) });
+                });
+                if (((parsedMsg as any).data as { success?: boolean }).success) {
+                    addNotification({ type: 'success', message: 'Detection succeeded.' });
+                }
+                // Re-fetch plates and alerts after detection
+                tabService.getLicensePlates(platesPage, platesPagination.limit)
+                    .then(res => {
+                        setTabData(Array.isArray(res.data) ? res.data : []);
+                        setPlatesPagination(res.pagination || platesPagination);
+                    });
+                tabService.getAlerts().then((data) => {
+                    const alertList: Alert[] = Array.isArray(data.data) ? data.data : [];
+                    setAlerts(alertList);
+                    setUnacknowledgedCount(alertList.filter((a) => !a.acknowledged).length);
+                });
+            } else if (eventType === 'alert') {
+                addNotification({ type: 'warning', message: ((parsedMsg as any).data as { message?: string })?.message || 'Alert detected!' });
+                // Re-fetch alerts after alert event
+                tabService.getAlerts().then((data) => {
+                    const alertList: Alert[] = Array.isArray(data.data) ? data.data : [];
+                    setAlerts(alertList);
+                    setUnacknowledgedCount(alertList.filter((a) => !a.acknowledged).length);
+                });
+            } else if (eventType === 'complete') {
+                addNotification({ type: 'success', message: 'Video processing complete.' });
+            } else {
+                console.log('[Socket] Unknown event type:', eventType);
+            }
+        });
+
+        socket.on('error', (err: unknown) => {
+            addNotification({ type: 'error', message: (err as { message?: string })?.message || 'Socket error during processing.' });
+            setProcessLoading(false);
+            socket.disconnect();
+        });
+
+        return () => {
+            socket.disconnect();
+            socketRef.current = null;
+        };
+    }, []);
 
     // Handler for opening plate edit modal
     const handleOpenEditPlate = (plate: Plate) => {
@@ -664,18 +756,14 @@ export default function Dashboard() {
                     </div>
                     {/* Current Event - 1/3 width */}
                     <div className="md:col-span-1 bg-gray-900 rounded-xl p-6 flex flex-col items-center min-h-[320px] shadow-2xl border border-indigo-700/30">
-                        <h3 className="text-xl font-bold text-indigo-300 mb-4 w-full text-center tracking-wide uppercase">Detection Result</h3>
-                        {/* Car Image */}
-                        {processResult && processResult.detections && processResult.detections.length > 0 ? (
-                            <>
-                                <div className="w-full flex flex-col items-center mb-4">
-                                    <div className="w-48 h-28 rounded-lg flex items-center justify-center shadow-inner border-2 border-indigo-600/30 mb-2 bg-gradient-to-br from-indigo-900 via-gray-900 to-indigo-700">
-                                        <img src={processResult.detections[0].vehicle.signed_url} alt="Detected Vehicle" className="w-full h-full object-cover rounded" />
-                                    </div>
-                                    <span className="text-base font-semibold text-indigo-300">Detected Vehicle</span>
+                        <h3 className="text-xl font-bold text-indigo-300 mb-4 w-full text-center tracking-wide uppercase">Detection Results</h3>
+                        {detectionResult ? (
+                            <div className="w-full flex flex-col items-center mb-4">
+                                <div className="w-48 h-28 rounded-lg flex items-center justify-center shadow-inner border-2 border-indigo-600/30 mb-2 bg-gradient-to-br from-indigo-900 via-gray-900 to-indigo-700">
+                                    <img src={detectionResult.vehicle?.signed_url} alt="Detected Vehicle" className="w-full h-full object-cover rounded" />
                                 </div>
-                                {/* Plate Info Table */}
-                                <div className="w-full">
+                                <span className="text-base font-semibold text-indigo-300">Detected Vehicle</span>
+                                <div className="w-full mt-2">
                                     <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
                                         <thead>
                                             <tr>
@@ -686,8 +774,8 @@ export default function Dashboard() {
                                         <tbody>
                                             <tr>
                                                 <td className="px-3 py-3">
-                                                    {processResult.detections[0].license_plate?.signed_url ? (
-                                                        <img src={processResult.detections[0].license_plate.signed_url} alt="Plate" className="w-20 h-8 object-cover rounded border border-indigo-400/40" />
+                                                    {detectionResult.license_plate?.signed_url ? (
+                                                        <img src={detectionResult.license_plate.signed_url} alt="Plate" className="w-20 h-8 object-cover rounded border border-indigo-400/40" />
                                                     ) : (
                                                         <div className="w-20 h-8 bg-gray-600 rounded flex items-center justify-center text-gray-400 border border-gray-500">
                                                             <FaEdit className="text-lg" />
@@ -696,22 +784,20 @@ export default function Dashboard() {
                                                     )}
                                                 </td>
                                                 <td className="px-3 py-3 font-bold text-gray-200 text-base">
-                                                    {processResult.detections[0].license_plate?.number || '-'}
+                                                    {detectionResult.license_plate?.number || '-'}
                                                 </td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
-                            </>
+                            </div>
                         ) : (
-                            <>
-                                <div className="w-full flex flex-col items-center mb-4">
-                                    <div className="w-48 h-28 rounded-lg flex items-center justify-center shadow-inner border-2 border-indigo-600/30 mb-2 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-700">
-                                        <FaEdit className="text-3xl text-gray-400" />
-                                    </div>
-                                    <span className="text-base font-semibold text-gray-400">No Detection</span>
+                            <div className="w-full flex flex-col items-center mb-4">
+                                <div className="w-48 h-28 rounded-lg flex items-center justify-center shadow-inner border-2 border-indigo-600/30 mb-2 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-700">
+                                    <FaEdit className="text-3xl text-gray-400" />
                                 </div>
-                                <div className="w-full">
+                                <span className="text-base font-semibold text-gray-400">No Detection</span>
+                                <div className="w-full mt-2">
                                     <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
                                         <thead>
                                             <tr>
@@ -732,7 +818,7 @@ export default function Dashboard() {
                                         </tbody>
                                     </table>
                                 </div>
-                            </>
+                            </div>
                         )}
                     </div>
                 </section>

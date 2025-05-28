@@ -48,4 +48,40 @@ export const useNotificationStore = create<NotificationState>((set) => ({
       notifications: state.notifications.filter((n) => n.id !== id),
     })),
   clearNotifications: () => set({ notifications: [] }),
+}));
+
+// DetectionType for detection results
+export type DetectionType = {
+  detection_time: string;
+  frame_number: number;
+  license_plate: {
+    gcs_url: string;
+    id: number;
+    image_path: string;
+    number: string;
+    signed_url: string;
+  };
+  success: boolean;
+  vehicle: {
+    color: string | null;
+    gcs_url: string;
+    id: number;
+    image_path: string;
+    plate_number: string;
+    signed_url: string;
+  };
+};
+
+interface DetectionState {
+  detectionResults: DetectionType[];
+  setDetectionResults: (results: DetectionType[]) => void;
+  addDetectionResult: (result: DetectionType) => void;
+  clearDetectionResults: () => void;
+}
+
+export const useDetectionStore = create<DetectionState>((set) => ({
+  detectionResults: [],
+  setDetectionResults: (results) => set({ detectionResults: results }),
+  addDetectionResult: (result) => set((state) => ({ detectionResults: [...state.detectionResults, result] })),
+  clearDetectionResults: () => set({ detectionResults: [] }),
 })); 
