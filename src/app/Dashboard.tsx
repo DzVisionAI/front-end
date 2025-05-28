@@ -183,7 +183,6 @@ export default function Dashboard() {
     const [uploadLoading, setUploadLoading] = useState(false);
     const [processLoading, setProcessLoading] = useState(false);
     const socketRef = useRef<Socket | null>(null);
-    const [socketConnected, setSocketConnected] = useState(false);
 
     // Add state for modals and editing
     const [editPlateModal, setEditPlateModal] = useState<{ open: boolean; plate: Plate | null }>({ open: false, plate: null });
@@ -207,18 +206,8 @@ export default function Dashboard() {
     // Add state for vehicule search
     const [vehiculeSearch, setVehiculeSearch] = useState('');
 
-    // Replace detectionResults state with useState
-    const [detectionResults, setDetectionResults] = useState<DetectionType[]>([]);
-    const [forceRender, setForceRender] = useState(0); // Dummy state to force re-render
-    const detectionResultsRef = useRef<DetectionType[]>([]);
-    useEffect(() => {
-        detectionResultsRef.current = detectionResults;
-    }, [detectionResults]);
-    const addDetectionResult = (det: DetectionType) => setDetectionResults(prev => [...prev, det]);
-    const clearDetectionResults = () => setDetectionResults([]);
-
-    // Debug: Log detectionResults on every render
-    console.log('[Render] Component rendered with detectionResults:', detectionResults.length);
+    // Replace detectionResults state with a single detectionResult
+    const [detectionResult, setDetectionResult] = useState<DetectionType | null>(null);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -353,7 +342,7 @@ export default function Dashboard() {
         setUploadedFilename(null);
         setUploadPreview(null);
         setUploadLoading(true);
-        clearDetectionResults();
+        setDetectionResult(null);
         addNotification({ type: 'info', message: 'Uploading media...' });
         try {
             let data;
@@ -380,23 +369,35 @@ export default function Dashboard() {
         setUploadType(null);
         setUploadedFilename(null);
         setUploadPreview(null);
-        clearDetectionResults();
+        setDetectionResult(null);
     };
 
     const handleProcessUpload = async () => {
         if (!uploadedFilename || !uploadType) return;
         setProcessLoading(true);
-        clearDetectionResults();
+        setDetectionResult(null);
         if (uploadType === 'image') {
             try {
                 const data = await videoService.processImage(uploadedFilename);
                 if (Array.isArray(data.detections)) {
                     data.detections.forEach((det: DetectionType) =>
-                        addDetectionResult(det)
+                        setDetectionResult(det)
                     );
                 }
                 if (data && data.success) {
                     addNotification({ type: 'success', message: data.message || 'Process succeeded.' });
+                    // Re-fetch plates after image process
+                    tabService.getLicensePlates(platesPage, platesPagination.limit)
+                        .then(res => {
+                            setTabData(Array.isArray(res.data) ? res.data : []);
+                            setPlatesPagination(res.pagination || platesPagination);
+                        });
+                    // Re-fetch alerts after image process
+                    tabService.getAlerts().then((data) => {
+                        const alertList: Alert[] = Array.isArray(data.data) ? data.data : [];
+                        setAlerts(alertList);
+                        setUnacknowledgedCount(alertList.filter((a) => !a.acknowledged).length);
+                    });
                 } else {
                     addNotification({ type: 'error', message: data && data.message ? data.message : 'Process failed.' });
                 }
@@ -419,16 +420,14 @@ export default function Dashboard() {
         socketRef.current = socket;
 
         socket.on('connect', () => {
-            setSocketConnected(true);
             console.log('[Socket] Connected');
         });
 
         socket.on('disconnect', () => {
-            setSocketConnected(false);
             console.log('[Socket] Disconnected');
         });
 
-        socket.on('video_event', (msg: any) => {
+        socket.on('video_event', (msg: unknown) => {
             let parsedMsg = msg;
             if (typeof msg === 'string') {
                 try {
@@ -439,20 +438,36 @@ export default function Dashboard() {
                 }
             }
             console.log('[Socket] Parsed message:', parsedMsg);
-            const eventType = String(parsedMsg.type).trim();
+            const eventType = String((parsedMsg as any).type).trim();
             if (eventType === 'progress') {
                 // Handle progress update
             } else if (eventType === 'detection') {
-                console.log('[Socket] Adding detection:', parsedMsg.data);
+                console.log('[Socket] Adding detection:', (parsedMsg as any).data);
                 flushSync(() => {
-                    setDetectionResults(prev => [...prev, { ...(parsedMsg.data as DetectionType) }]);
-                    setForceRender(f => f + 1); // Force a re-render
+                    setDetectionResult({ ...((parsedMsg as any).data as DetectionType) });
                 });
-                if ((parsedMsg.data as { success?: boolean }).success) {
+                if (((parsedMsg as any).data as { success?: boolean }).success) {
                     addNotification({ type: 'success', message: 'Detection succeeded.' });
                 }
+                // Re-fetch plates and alerts after detection
+                tabService.getLicensePlates(platesPage, platesPagination.limit)
+                    .then(res => {
+                        setTabData(Array.isArray(res.data) ? res.data : []);
+                        setPlatesPagination(res.pagination || platesPagination);
+                    });
+                tabService.getAlerts().then((data) => {
+                    const alertList: Alert[] = Array.isArray(data.data) ? data.data : [];
+                    setAlerts(alertList);
+                    setUnacknowledgedCount(alertList.filter((a) => !a.acknowledged).length);
+                });
             } else if (eventType === 'alert') {
-                addNotification({ type: 'warning', message: (parsedMsg.data as { message?: string })?.message || 'Alert detected!' });
+                addNotification({ type: 'warning', message: ((parsedMsg as any).data as { message?: string })?.message || 'Alert detected!' });
+                // Re-fetch alerts after alert event
+                tabService.getAlerts().then((data) => {
+                    const alertList: Alert[] = Array.isArray(data.data) ? data.data : [];
+                    setAlerts(alertList);
+                    setUnacknowledgedCount(alertList.filter((a) => !a.acknowledged).length);
+                });
             } else if (eventType === 'complete') {
                 addNotification({ type: 'success', message: 'Video processing complete.' });
             } else {
@@ -590,20 +605,8 @@ export default function Dashboard() {
         });
     };
 
-    // Add this right before the return statement in the Dashboard component
-    console.log('[Render] Component rendering with detectionResults:', {
-        length: detectionResults.length,
-        lastResult: detectionResults[detectionResults.length - 1]
-    });
-
     return (
         <div className="min-h-screen flex flex-col bg-gray-900 text-gray-200 font-inter">
-            {/* Socket connection status */}
-            <div style={{ color: socketConnected ? 'lime' : 'red', background: '#222', padding: 8, margin: 8, borderRadius: 4 }}>
-                <strong>Socket status:</strong> {socketConnected ? 'Connected' : 'Disconnected'}<br />
-                <strong>DetectionResults length:</strong> {detectionResults.length}
-                <pre style={{ maxHeight: 200, overflow: 'auto', fontSize: 12 }}>{JSON.stringify(detectionResults, null, 2)}</pre>
-            </div>
             {/* Header */}
             <header className="w-full bg-gray-800 shadow flex items-center justify-between px-6 py-4">
                 <div className="flex items-center">
@@ -754,47 +757,40 @@ export default function Dashboard() {
                     {/* Current Event - 1/3 width */}
                     <div className="md:col-span-1 bg-gray-900 rounded-xl p-6 flex flex-col items-center min-h-[320px] shadow-2xl border border-indigo-700/30">
                         <h3 className="text-xl font-bold text-indigo-300 mb-4 w-full text-center tracking-wide uppercase">Detection Results</h3>
-                        {detectionResults.length > 0 ? (
-                            <>
-                                <div className="text-xs text-gray-400 mb-2">
-                                    Total detections: {detectionResults.length}
+                        {detectionResult ? (
+                            <div className="w-full flex flex-col items-center mb-4">
+                                <div className="w-48 h-28 rounded-lg flex items-center justify-center shadow-inner border-2 border-indigo-600/30 mb-2 bg-gradient-to-br from-indigo-900 via-gray-900 to-indigo-700">
+                                    <img src={detectionResult.vehicle?.signed_url} alt="Detected Vehicle" className="w-full h-full object-cover rounded" />
                                 </div>
-                                {detectionResults.map((det, idx) => (
-                                    <div key={`${det.detection_time}-${idx}`} className="w-full flex flex-col items-center mb-4">
-                                        <div className="w-48 h-28 rounded-lg flex items-center justify-center shadow-inner border-2 border-indigo-600/30 mb-2 bg-gradient-to-br from-indigo-900 via-gray-900 to-indigo-700">
-                                            <img src={det.vehicle?.signed_url} alt="Detected Vehicle" className="w-full h-full object-cover rounded" />
-                                        </div>
-                                        <span className="text-base font-semibold text-indigo-300">Detected Vehicle</span>
-                                        <div className="w-full mt-2">
-                                            <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
-                                                <thead>
-                                                    <tr>
-                                                        <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Image</th>
-                                                        <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Number</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <tr>
-                                                        <td className="px-3 py-3">
-                                                            {det.license_plate?.signed_url ? (
-                                                                <img src={det.license_plate.signed_url} alt="Plate" className="w-20 h-8 object-cover rounded border border-indigo-400/40" />
-                                                            ) : (
-                                                                <div className="w-20 h-8 bg-gray-600 rounded flex items-center justify-center text-gray-400 border border-gray-500">
-                                                                    <FaEdit className="text-lg" />
-                                                                    <span className="ml-1 text-xs">Plate Img</span>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-3 py-3 font-bold text-gray-200 text-base">
-                                                            {det.license_plate?.number || '-'}
-                                                        </td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                ))}
-                            </>
+                                <span className="text-base font-semibold text-indigo-300">Detected Vehicle</span>
+                                <div className="w-full mt-2">
+                                    <table className="min-w-full text-sm rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
+                                        <thead>
+                                            <tr>
+                                                <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Image</th>
+                                                <th className="px-3 py-2 text-left text-gray-300 font-semibold border-b border-gray-600">Plate Number</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td className="px-3 py-3">
+                                                    {detectionResult.license_plate?.signed_url ? (
+                                                        <img src={detectionResult.license_plate.signed_url} alt="Plate" className="w-20 h-8 object-cover rounded border border-indigo-400/40" />
+                                                    ) : (
+                                                        <div className="w-20 h-8 bg-gray-600 rounded flex items-center justify-center text-gray-400 border border-gray-500">
+                                                            <FaEdit className="text-lg" />
+                                                            <span className="ml-1 text-xs">Plate Img</span>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-3 font-bold text-gray-200 text-base">
+                                                    {detectionResult.license_plate?.number || '-'}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         ) : (
                             <div className="w-full flex flex-col items-center mb-4">
                                 <div className="w-48 h-28 rounded-lg flex items-center justify-center shadow-inner border-2 border-indigo-600/30 mb-2 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-700">
